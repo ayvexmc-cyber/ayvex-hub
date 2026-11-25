@@ -1,0 +1,845 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Weekly Meal Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky title + tab bar; one panel per tab sized to fit the screen (Overview, Week 1, Week 2, Shopping, Tips).
+   Week panels use day sub-tabs so one day shows at a time. Spacing on a 4/8 scale. White ground, one green accent. */
+/* Single white look on purpose: no dark theme. */
+:root {
+  --bg: #ffffff;
+  --tint: #f2f6f3;        /* tinted neutral fill */
+  --tint-2: #e7eee9;
+  --fg: #17241c;
+  --muted: #5f6f66;
+  --faint: #8a9890;
+  --accent: #2f7d55;      /* the one accent */
+  --accent-soft: #e3f1e8;
+  --b: #d98a1c; --l: #2f7d55; --d: #3b6fb6; --s: #c8577a; --t: #2a8c8c;   /* meal slot markers only */
+  --shadow: 0 1px 2px rgba(23,36,28,.05), 0 4px 16px rgba(23,36,28,.06);
+  --r: 14px; --r-in: 10px; --r-sm: 6px;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+
+.food-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.food-bg svg { position: absolute; opacity: .13; }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); }
+.top-in, main {
+  max-width: 1160px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.top-in { padding-block: 16px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-family: var(--font-display); font-weight: 800; font-size: 24px; letter-spacing: -.02em; margin: 0; }
+.brand span { color: var(--muted); font-size: 13px; }
+
+.tabs { position: relative; display: flex; gap: 4px; padding: 4px; background: var(--tint); border-radius: 12px; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a { position: relative; z-index: 1; text-decoration: none; color: var(--muted); font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; white-space: nowrap; transition: color .2s ease-out; }
+.tabs a[aria-selected="true"] { color: var(--fg); }
+.tabs a:hover { color: var(--fg); }
+.tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tab-ind { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 0; width: 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); transition: transform .22s cubic-bezier(.2,.8,.2,1), width .22s cubic-bezier(.2,.8,.2,1); }
+
+main { position: relative; z-index: 1; padding-block: 16px 32px; }
+.panel { display: flex; flex-direction: column; gap: 16px; animation: enter .2s ease-out; }
+@keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .panel, .meals { animation: none !important; } .tab-ind, .seg-ind { transition: none !important; } }
+
+.card { background: #fff; border-radius: var(--r); box-shadow: var(--shadow); }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -.01em; margin: 0; }
+.muted { color: var(--muted); }
+
+/* Overview */
+.ov { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .ov { grid-template-columns: 1fr; } }
+.hero { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.hero .eyebrow { color: var(--accent); font-weight: 600; font-size: 13px; }
+.big { font-family: var(--font-display); font-weight: 800; font-size: clamp(48px, 7vw, 72px); line-height: .95; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.big small { font-family: var(--font-body); font-size: 16px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 8px; }
+.bar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; gap: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--c); }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.facts div { background: var(--tint); border-radius: var(--r-in); padding: 12px; }
+.facts b { display: block; font-family: var(--font-display); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.facts span { font-size: 12px; color: var(--muted); }
+.actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.btn { appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; font-size: 14px; text-decoration: none; background: var(--accent); color: #fff; padding: 10px 18px; border-radius: 10px; transition: transform .15s ease-out, background .15s ease-out; }
+.btn:hover { background: #276b48; }
+.btn:active { transform: scale(.98); }
+.link { appearance: none; border: 0; background: none; cursor: pointer; font: inherit; font-weight: 600; color: var(--accent); text-decoration: none; padding: 0; }
+.link:hover { text-decoration: underline; }
+.btn:focus-visible, .link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.art { position: relative; min-height: 280px; background: var(--accent-soft); border-radius: var(--r); overflow: hidden; }
+.art svg { position: absolute; }
+.nutri { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.nutri-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px 24px; }
+.nutri-grid div { display: grid; grid-template-columns: 8px 1fr; gap: 0 10px; align-items: baseline; font-size: 13px; color: var(--muted); }
+.nutri-grid .dot { background: var(--accent); transform: translateY(-1px); }
+.nutri-grid b { color: var(--fg); font-weight: 600; }
+
+/* Segmented control (days, weeks) */
+.seg { position: relative; display: flex; gap: 2px; padding: 4px; background: var(--tint); border-radius: 12px; overflow-x: auto; scrollbar-width: none; }
+.seg::-webkit-scrollbar { display: none; }
+.seg button { position: relative; z-index: 1; flex: 1 0 auto; appearance: none; border: 0; background: none; cursor: pointer; font: inherit; padding: 6px 12px; border-radius: 8px; color: var(--muted); text-align: center; line-height: 1.3; transition: color .2s ease-out; }
+.seg button b { display: block; font-weight: 600; font-size: 13px; }
+.seg button small { font-size: 11px; color: var(--faint); }
+.seg button[aria-selected="true"] { color: var(--fg); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.seg-ind { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 0; width: 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); transition: transform .22s cubic-bezier(.2,.8,.2,1), width .22s cubic-bezier(.2,.8,.2,1); }
+
+/* Week panel */
+.day-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.day-sum { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.day-sum h2 { font-size: 24px; }
+.day-sum .nums { color: var(--muted); font-variant-numeric: tabular-nums; }
+.day-sum .nums b { color: var(--fg); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 12px; font-weight: 500; color: var(--accent); background: var(--accent-soft); border-radius: 99px; padding: 2px 10px; }
+.eaten { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.eaten i { display: block; width: 96px; height: 4px; border-radius: 99px; background: var(--tint-2); overflow: hidden; }
+.eaten i span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s ease-out; }
+.meal-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.meal-pics { flex: none; display: flex; padding-right: 4px; }
+.meal-pics svg { width: 46px; height: 46px; margin-left: -12px; filter: drop-shadow(0 3px 4px rgba(23,36,28,.14)); animation: pop .3s cubic-bezier(.2,.8,.2,1) both; }
+.meal-pics svg:first-child { margin-left: 0; }
+.meal-pics svg:nth-child(odd) { rotate: -8deg; }
+.meal-pics svg:nth-child(even) { rotate: 8deg; translate: 0 4px; }
+@keyframes pop { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .meal-pics svg { animation: none; } }
+.meals { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; animation: enter .18s ease-out; }
+.meal { padding: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.meal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.slot { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.slot em { font-style: normal; font-weight: 500; color: var(--faint); }
+.tick { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.tick input { appearance: none; width: 18px; height: 18px; margin: 0; border-radius: var(--r-sm); background: var(--tint-2); cursor: pointer; display: grid; place-items: center; transition: background .15s ease-out; }
+.tick input:checked { background: var(--accent); }
+.tick input:checked::after { content: ""; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+.tick input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.meal h3 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+.meal .kc { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.meal ul { margin: 0; padding: 8px 12px; list-style: none; background: var(--tint); border-radius: var(--r-in); columns: 2 220px; column-gap: 24px; font-size: 13px; }
+.meal li { break-inside: avoid; padding: 2px 0; display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.meal li b, .kc b { color: var(--fg); font-weight: 700; white-space: nowrap; }
+.slot { flex-wrap: wrap; }
+a.keep { text-decoration: none; }
+.keep.batch, .store.batch { background: var(--accent-soft); color: var(--accent); }
+a.keep.batch:hover { text-decoration: underline; }
+a.keep.batch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Batch prep */
+.batch-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.batch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; align-items: start; }
+.bcard { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.bcard-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.bcard h3 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+.bcard .when { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.bcard .lbl { font-size: 12px; font-weight: 600; color: var(--faint); margin-top: 4px; }
+.rows { margin: 0; padding: 8px 12px; list-style: none; background: var(--tint); border-radius: var(--r-in); font-size: 13px; }
+.rows li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-variant-numeric: tabular-nums; }
+.rows li b { font-weight: 700; white-space: nowrap; }
+.rows li em { font-style: normal; color: var(--faint); margin-right: 6px; }
+.rows li.total { box-shadow: 0 -1px 0 var(--tint-2); margin-top: 4px; padding-top: 6px; font-weight: 600; }
+.bcard p { margin: 0; font-size: 13px; color: var(--muted); }
+.bcard .keeps { font-size: 12.5px; color: var(--muted); }
+.bcard .keeps b { color: var(--fg); font-weight: 600; }
+.keep { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; }
+.keep.cold, .store.cold { background: #e6eefa; color: #2f5f9e; }
+.keep.eat, .store.eat { background: var(--tint); color: var(--muted); }
+.keep.shelf, .store.shelf { background: #fbf0dc; color: #8a5a12; }
+.steps summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--accent); border-radius: var(--r-sm); }
+.steps summary::-webkit-details-marker { display: none; }
+.steps summary::after { content: ""; width: 6px; height: 6px; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-2px) rotate(45deg); transition: transform .2s ease-out; }
+.steps[open] summary::after { transform: translateY(1px) rotate(-135deg); }
+.steps summary:hover { text-decoration: underline; }
+.steps summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.steps[open] > :not(summary) { animation: enter .18s ease-out; }
+.steps ol { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.steps ol li::marker { color: var(--faint); font-variant-numeric: tabular-nums; }
+.store { margin-top: 8px; font-size: 12.5px; border-radius: var(--r-sm); padding: 6px 10px; }
+@media (prefers-reduced-motion: reduce) { .steps[open] > :not(summary) { animation: none; } }
+
+/* Prep guide */
+.prep { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .prep { grid-template-columns: 1fr; } }
+.prep .card { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.routine { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px; counter-reset: step; }
+.routine > li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; counter-increment: step; }
+.routine > li::before { content: counter(step); width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.routine h3 { font-size: 15px; font-weight: 600; margin: 3px 0 2px; }
+.routine h3 span { color: var(--faint); font-weight: 500; font-size: 13px; margin-left: 6px; }
+.routine ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.rules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.rules li { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; font-size: 13px; }
+.rules li + li { box-shadow: 0 -1px 0 var(--tint-2); }
+.rules li b { font-weight: 600; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.warn { background: #fbf0dc; color: #6e4a10; border-radius: var(--r-in); padding: 10px 12px; font-size: 13px; }
+.meal.done h3 { color: var(--faint); text-decoration: line-through; }
+
+/* Shopping */
+.shop-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.shop-bar .seg { flex: 0 0 auto; }
+.shop { padding: 20px; columns: 3 240px; column-gap: 32px; }
+.group { break-inside: avoid; margin-bottom: 20px; }
+.group h3 { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+.group label { display: grid; grid-template-columns: 16px 1fr auto; gap: 10px; align-items: center; padding: 4px 0; cursor: pointer; font-size: 14px; }
+.group label small { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+.group input { appearance: none; width: 16px; height: 16px; margin: 0; border-radius: 5px; background: var(--tint-2); display: grid; place-items: center; cursor: pointer; transition: background .15s ease-out; }
+.group input:checked { background: var(--accent); }
+.group input:checked::after { content: ""; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+.group input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.group label:has(input:checked) span { color: var(--faint); text-decoration: line-through; }
+
+/* Tips */
+.tips { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.tip { padding: 16px; }
+.tip h3 { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+.tip p { margin: 0; font-size: 13px; color: var(--muted); }
+.note { font-size: 12px; color: var(--faint); max-width: 80ch; margin: 0; }
+</style>
+
+<!-- Cartoon food illustrations -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="f-apple" viewBox="0 0 64 64"><path d="M32 19c-7-6-21-3-21 12 0 15 10 27 21 23 11 4 21-8 21-23 0-15-14-18-21-12z" fill="#e5533d"/><path d="M32 19c0-5 2-9 6-12" stroke="#6b4423" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M35 15c4-6 12-7 15-3-4 5-11 6-15 3z" fill="#4caf50"/><ellipse cx="21" cy="30" rx="3" ry="6" fill="#fff" opacity=".35"/></symbol>
+  <symbol id="f-broc" viewBox="0 0 64 64"><path d="M27 38h10l3 20H24z" fill="#9ccc65"/><circle cx="21" cy="29" r="11" fill="#3f9c4a"/><circle cx="43" cy="29" r="11" fill="#3f9c4a"/><circle cx="32" cy="19" r="12" fill="#4caf50"/><circle cx="32" cy="33" r="9" fill="#43a047"/><circle cx="27" cy="15" r="3" fill="#fff" opacity=".25"/></symbol>
+  <symbol id="f-carrot" viewBox="0 0 64 64"><path d="M41 21 14 54c-2 3 1 6 4 3l31-26z" fill="#f28c28"/><path d="M41 21c2-8 8-13 14-13-2 6-6 10-10 12 6-1 10 1 12 5-6 2-11 1-16-2z" fill="#4caf50"/><path d="M25 40l5 3M31 33l5 3M20 47l4 2" stroke="#d9711a" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="f-banana" viewBox="0 0 64 64"><path d="M11 21c4 23 23 33 43 25 2-1 2-4 0-4-18 4-33-6-37-22-1-3-6-3-6 1z" fill="#f7c948"/><path d="M11 21l-2-6 6 1z" fill="#6b4423"/><path d="M54 46l4 2-2-4z" fill="#6b4423"/><path d="M18 24c4 12 14 18 26 18" stroke="#e0ad2a" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="f-egg" viewBox="0 0 64 64"><path d="M13 35c-4-13 8-23 19-19 8-6 22 0 20 12 6 9-2 21-14 18-8 7-23 3-25-11z" fill="#fff" stroke="#e4e0d4" stroke-width="2"/><circle cx="32" cy="32" r="9" fill="#f6b221"/><circle cx="29" cy="29" r="2.5" fill="#fff" opacity=".6"/></symbol>
+  <symbol id="f-fish" viewBox="0 0 64 64"><path d="M7 32c9-13 31-15 41 0-10 15-32 13-41 0z" fill="#4f8fd6"/><path d="M46 32l12-10v20z" fill="#3b78c2"/><circle cx="17" cy="30" r="2.5" fill="#17241c"/><path d="M26 25c3 4 3 10 0 14" stroke="#fff" stroke-width="2" fill="none" opacity=".5"/></symbol>
+  <symbol id="f-avo" viewBox="0 0 64 64"><path d="M32 6c-10 0-14 14-18 26-4 14 4 26 18 26s22-12 18-26C46 20 42 6 32 6z" fill="#3f7d3a"/><path d="M32 12c-7 0-10 11-13 21-3 11 3 20 13 20s16-9 13-20c-3-10-6-21-13-21z" fill="#c5e17a"/><circle cx="32" cy="38" r="8" fill="#8d5a2b"/><circle cx="29" cy="35" r="2" fill="#fff" opacity=".3"/></symbol>
+  <symbol id="f-straw" viewBox="0 0 64 64"><path d="M32 58C18 48 10 36 14 26c3-6 10-8 18-6 8-2 15 0 18 6 4 10-4 22-18 32z" fill="#e8434a"/><path d="M21 21l11-11 11 11-11-3z" fill="#4caf50"/><g fill="#ffe08a"><circle cx="24" cy="30" r="1.5"/><circle cx="32" cy="28" r="1.5"/><circle cx="40" cy="30" r="1.5"/><circle cx="28" cy="38" r="1.5"/><circle cx="36" cy="38" r="1.5"/><circle cx="32" cy="46" r="1.5"/></g></symbol>
+  <symbol id="f-leg" viewBox="0 0 64 64"><ellipse cx="40" cy="24" rx="16" ry="15" transform="rotate(-35 40 24)" fill="#c9783a"/><path d="M30 36 17 49" stroke="#f3e6cf" stroke-width="6" stroke-linecap="round"/><circle cx="14" cy="49" r="4" fill="#f3e6cf"/><circle cx="18" cy="53" r="4" fill="#f3e6cf"/><ellipse cx="44" cy="18" rx="5" ry="3" transform="rotate(-35 44 18)" fill="#fff" opacity=".25"/></symbol>
+  <symbol id="f-milk" viewBox="0 0 64 64"><path d="M20 21h24v35H20z" fill="#fff" stroke="#cfd8e3" stroke-width="2"/><path d="M20 21l6-11h12l6 11z" fill="#eef2f7" stroke="#cfd8e3" stroke-width="2"/><rect x="21" y="32" width="22" height="12" fill="#4f8fd6"/></symbol>
+  <symbol id="f-bread" viewBox="0 0 64 64"><path d="M14 26c-6-10 2-18 18-18s24 8 18 18v26a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4z" fill="#d9964a"/><path d="M19 28c-4-7 2-13 13-13s17 6 13 13v22H19z" fill="#f6dfb2"/></symbol>
+  <symbol id="f-cheese" viewBox="0 0 64 64"><path d="M8 40 46 16l10 8v16H8z" fill="#f7c948"/><path d="M8 40h48v12H8z" fill="#e8b532"/><circle cx="26" cy="45" r="3" fill="#d29a24"/><circle cx="43" cy="47" r="2.5" fill="#d29a24"/><circle cx="41" cy="31" r="3" fill="#e0ad2a"/></symbol>
+  <symbol id="f-tomato" viewBox="0 0 64 64"><circle cx="32" cy="37" r="20" fill="#e5533d"/><path d="M21 19l11 6 11-6-4 8H25z" fill="#4caf50"/><ellipse cx="24" cy="33" rx="4" ry="6" fill="#fff" opacity=".3"/></symbol>
+  <symbol id="f-orange" viewBox="0 0 64 64"><circle cx="32" cy="36" r="20" fill="#f59a23"/><path d="M32 16c2-5 7-7 11-6-1 5-6 7-11 6z" fill="#4caf50"/><g fill="#e2861a"><circle cx="26" cy="33" r="1.3"/><circle cx="37" cy="41" r="1.3"/><circle cx="40" cy="30" r="1.3"/><circle cx="28" cy="45" r="1.3"/></g><ellipse cx="24" cy="31" rx="4" ry="6" fill="#fff" opacity=".25"/></symbol>
+  <symbol id="f-ricecake" viewBox="0 0 64 64"><ellipse cx="32" cy="38" rx="24" ry="10" fill="#e4c48e"/><ellipse cx="32" cy="34" rx="24" ry="10" fill="#f4e2bd"/><g fill="#e4c48e"><circle cx="22" cy="33" r="1.5"/><circle cx="30" cy="36" r="1.5"/><circle cx="38" cy="32" r="1.5"/><circle cx="44" cy="36" r="1.5"/><circle cx="26" cy="38" r="1.5"/></g></symbol>
+  <symbol id="f-jar" viewBox="0 0 64 64"><rect x="18" y="12" width="28" height="9" rx="3" fill="#c0392b"/><path d="M16 22h32v28a6 6 0 0 1-6 6H22a6 6 0 0 1-6-6z" fill="#b5793a"/><rect x="20" y="30" width="24" height="14" rx="3" fill="#f6dfb2"/><circle cx="32" cy="37" r="4" fill="#b5793a"/></symbol>
+  <symbol id="f-bowl" viewBox="0 0 64 64"><ellipse cx="32" cy="30" rx="24" ry="7" fill="#f3e6cf"/><path d="M8 30h48c0 14-11 24-24 24S8 44 8 30z" fill="#4f8fd6"/><path d="M12 30c4-4 10-6 20-6s16 2 20 6z" fill="#f6dfb2"/><circle cx="26" cy="27" r="2" fill="#e8434a"/><circle cx="36" cy="26" r="2" fill="#3f9c4a"/></symbol>
+</svg>
+
+<div class="food-bg" id="food-bg" aria-hidden="true"></div>
+
+<div class="top">
+  <div class="top-in">
+    <div class="brand"><h1>Weekly Meal Plan</h1><span>2 weeks · 2,200 kcal · age 13, 177 cm, 60 kg</span></div>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
+      <span class="tab-ind" id="tab-ind"></span>
+      <a href="#overview" role="tab" data-tab="overview">Overview</a>
+      <a href="#week-1" role="tab" data-tab="week-1">Week 1</a>
+      <a href="#week-2" role="tab" data-tab="week-2">Week 2</a>
+      <a href="#shopping" role="tab" data-tab="shopping">Shopping</a>
+      <a href="#batch" role="tab" data-tab="batch">Batch prep</a>
+      <a href="#prep" role="tab" data-tab="prep">Prep guide</a>
+      <a href="#tips" role="tab" data-tab="tips">Tips</a>
+    </nav>
+  </div>
+</div>
+
+<main>
+  <section class="panel" id="p-overview" role="tabpanel">
+    <div class="ov">
+      <div class="card hero">
+        <div class="eyebrow">Your daily target</div>
+        <div class="big">2,200<small>kcal a day</small></div>
+        <div class="bar" aria-label="Calorie split across the day">
+          <span style="flex:530;background:var(--b)"></span><span style="flex:600;background:var(--l)"></span><span style="flex:635;background:var(--d)"></span><span style="flex:240;background:var(--s)"></span><span style="flex:215;background:var(--t)"></span>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="--c:var(--b)"></i>Breakfast ~530</span>
+          <span><i class="dot" style="--c:var(--l)"></i>Packed lunch ~600</span>
+          <span><i class="dot" style="--c:var(--d)"></i>Dinner ~635</span>
+          <span><i class="dot" style="--c:var(--s)"></i>Snack ~240</span>
+          <span><i class="dot" style="--c:var(--t)"></i>After training ~215</span>
+        </div>
+        <div class="facts">
+          <div><b>110–145 g</b><span>protein a day</span></div>
+          <div><b>70</b><span>different meals</span></div>
+          <div><b>≤ 10 min</b><span>most meals</span></div>
+        </div>
+        <div class="actions">
+          <a class="btn" href="#week-1">Start Week 1</a>
+          <a class="link" href="#shopping">See the shopping list</a>
+        </div>
+      </div>
+      <div class="art" id="art" aria-hidden="true"></div>
+    </div>
+    <div class="card nutri">
+      <h2>What makes you strong and look good</h2>
+      <p class="muted" style="margin:0">Every day covers protein, energy carbs, fiber, healthy fats, calcium, iron and vitamin C. Fish shows up a few times a week for omega-3.</p>
+      <div class="nutri-grid" id="nutri-key"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-week-1" role="tabpanel" hidden></section>
+  <section class="panel" id="p-week-2" role="tabpanel" hidden></section>
+
+  <section class="panel" id="p-shopping" role="tabpanel" hidden>
+    <div class="shop-bar">
+      <div>
+        <h2>Shopping list</h2>
+        <p class="muted" style="margin:2px 0 0;font-size:13px">Exact amounts the recipes use. Round up to the nearest pack. Salt, pepper and paprika not listed.</p>
+      </div>
+      <div class="actions">
+        <div class="seg" id="shop-seg" role="tablist" aria-label="Week">
+          <span class="seg-ind"></span>
+          <button type="button" role="tab" data-w="0"><b>Week 1</b></button>
+          <button type="button" role="tab" data-w="1"><b>Week 2</b></button>
+        </div>
+        <button type="button" class="link" id="shop-clear">Clear ticks</button>
+      </div>
+    </div>
+    <div class="card shop" id="shop"></div>
+  </section>
+
+  <section class="panel" id="p-batch" role="tabpanel" hidden>
+    <div class="batch-bar">
+      <div>
+        <h2>Batch prep</h2>
+        <p class="muted" style="margin:2px 0 0;font-size:13px">Make these at once and most nights are just 5 minutes of putting things together.</p>
+      </div>
+      <div class="seg" id="batch-seg" role="tablist" aria-label="Week">
+        <span class="seg-ind"></span>
+        <button type="button" role="tab" data-w="0"><b>Week 1</b></button>
+        <button type="button" role="tab" data-w="1"><b>Week 2</b></button>
+      </div>
+    </div>
+    <div class="batch-grid" id="batch-grid"></div>
+    <div class="warn">Don't batch these: wraps and sandwiches (only the night before, or they go soggy), lunches with chicken, tuna or egg (2 days ahead at most), rice (1 day) and avocado (cut it fresh).</div>
+  </section>
+
+  <section class="panel" id="p-prep" role="tabpanel" hidden>
+    <div class="prep">
+      <div class="card">
+        <h2>Your weekly routine</h2>
+        <ol class="routine">
+          <li><div><h3>Sunday: shop and prep <span>about 30 min</span></h3>
+            <ul>
+              <li>Shop with that week's list. Put cold food in the fridge as soon as you get home.</li>
+              <li>Boil 6–8 eggs: cover them with cold water, bring to the boil, then simmer 10 min. Move them to cold water for 5 min. Keep them in the fridge in their shells.</li>
+              <li>Put your ice pack in the freezer. Keep it there every night.</li>
+              <li>Pull the meat off a rotisserie chicken (or open the cooked strips) into a tub. Fridge, use within 3–4 days.</li>
+            </ul></div></li>
+          <li><div><h3>Wednesday: top up <span>5 min</span></h3>
+            <ul>
+              <li>Buy fresh cooked chicken for the rest of the week. The Sunday batch is done after 3–4 days.</li>
+              <li>Check the fridge. Throw out anything past its days in the fridge-rules list.</li>
+            </ul></div></li>
+          <li><div><h3>Every night: pack tomorrow <span>10 min</span></h3>
+            <ul>
+              <li>After dinner, open tomorrow in the plan and make the packed lunch. It goes in a tub or foil, then the fridge.</li>
+              <li>If breakfast says "night before", make the overnight oats now.</li>
+              <li>Put leftovers in the fridge within 1 hour of cooking.</li>
+            </ul></div></li>
+          <li><div><h3>Every morning: grab and go <span>2 min</span></h3>
+            <ul>
+              <li>Lunch from the fridge into an insulated lunch bag with the frozen ice pack on top.</li>
+              <li>Add the fruit and any snacks that don't need the fridge.</li>
+            </ul></div></li>
+          <li><div><h3>After school or training <span>within 1 hour</span></h3>
+            <ul>
+              <li>Eat the after-training snack. If it says "Fridge", pack it with the ice pack or eat it when you get home.</li>
+            </ul></div></li>
+        </ol>
+      </div>
+      <div class="card">
+        <h2>How long food keeps in the fridge</h2>
+        <ul class="rules">
+          <li><span>Cooked chicken, mince, pasta</span><b>3–4 days</b></li>
+          <li><span>Cooked salmon or white fish</span><b>2 days</b></li>
+          <li><span>Packed lunch with chicken, tuna or egg</span><b>2 days</b></li>
+          <li><span>Overnight oats</span><b>3 days</b></li>
+          <li><span>Boiled eggs, in the shell</span><b>1 week</b></li>
+          <li><span>Opened ham or sliced turkey</span><b>3–5 days</b></li>
+          <li><span>Opened hummus, cottage cheese</span><b>5 days</b></li>
+          <li><span>Cooked rice</span><b>1 day</b></li>
+          <li><span>Cut avocado</span><b>1 day</b></li>
+          <li><span>Chili or curry, frozen</span><b>3 months</b></li>
+        </ul>
+        <div class="warn">Food that needs the fridge can't sit out for more than 2 hours (1 hour on a hot day). With an ice pack in an insulated bag, it's fine until lunch. Thaw prawns in the fridge or cold water, never on the counter. Reheat leftovers until steaming hot. If something smells off, throw it out.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-tips" role="tabpanel" hidden>
+    <h2>Busy-guy shortcuts</h2>
+    <div class="tips">
+      <div class="card tip"><h3>Pack lunch at night</h3><p>Make it after dinner, put it in the fridge, grab it in the morning.</p></div>
+      <div class="card tip"><h3>Use an ice pack</h3><p>An insulated bag with an ice pack keeps chicken, tuna, eggs and yogurt safe until lunch.</p></div>
+      <div class="card tip"><h3>Buy chicken cooked</h3><p>A rotisserie chicken or ready-cooked strips covers most lunches. No cooking.</p></div>
+      <div class="card tip"><h3>Boil eggs in a batch</h3><p>Boil 6 eggs for 10 min on Sunday. They keep 5 days in the fridge.</p></div>
+      <div class="card tip"><h3>Frozen veg and rice pouches</h3><p>No chopping and they don't go bad. Dinner in 15 minutes.</p></div>
+      <div class="card tip"><h3>Eat after training</h3><p>Have the after-training snack within an hour of practice. On really big days, add one more snack.</p></div>
+      <div class="card tip"><h3>Enough protein</h3><p>About 1 g per pound (2 g per kg) is all your muscles can use. More just gets burned as energy.</p></div>
+      <div class="card tip"><h3>Sleep, water, training</h3><p>Muscle grows with 9+ hours of sleep, lots of water and regular training. Food is one part.</p></div>
+      <div class="card tip"><h3>Vitamin D</h3><p>Food gives you little. Get outside in daylight, and ask a doctor if you're low in winter.</p></div>
+    </div>
+    <p class="note">Calories, protein and nutrients are estimates. Show this plan to a parent so they can help with shopping and cooking. If you have allergies or a health condition, check with a doctor first.</p>
+  </section>
+</main>
+
+<script>
+// Ingredient catalog: key -> [name, unit, shopping group, plural]
+const G = ["Meat & fish","Dairy & eggs","Fruit & veg","Frozen","Bread & grains","Cupboard"];
+const C = {
+  chick_c:["cooked chicken","g",0], chick_r:["raw chicken breast","g",0], mince:["lean beef mince","g",0],
+  turkey:["sliced turkey","g",0], ham:["sliced ham","g",0],
+  salmon:["salmon fillet","",0,"salmon fillets"], fish:["white fish fillet","",0,"white fish fillets"],
+  sausage:["chicken sausage","",0,"chicken sausages"],
+  milk:["milk","ml",1], yogurt:["Greek yogurt","g",1], egg:["egg","",1,"eggs"],
+  cheddar:["cheddar","g",1], cottage:["cottage cheese","g",1], feta:["feta","g",1],
+  banana:["banana","",2,"bananas"], apple:["apple","",2,"apples"], orange:["orange","",2,"oranges"],
+  lemon:["lemon","",2,"lemons"], tomato:["tomato","",2,"tomatoes"], cucumber:["cucumber","",2,"cucumbers"],
+  pepper:["bell pepper","",2,"bell peppers"], onion:["onion","",2,"onions"], avocado:["avocado","",2,"avocados"],
+  sweetpot:["sweet potato","",2,"sweet potatoes"], salad:["salad leaves","g",2], spinach:["baby spinach","g",2],
+  carrots:["baby carrots","g",2], potatoes:["baby potatoes","g",2], grapes:["grapes","g",2],
+  broccoli:["frozen broccoli","g",3], stirfry:["frozen stir-fry veg","g",3], peas:["frozen peas","g",3],
+  berries:["frozen berries","g",3], prawns:["frozen cooked prawns","g",3],
+  bread:["slice whole-grain bread","",4,"slices whole-grain bread"], tortilla:["whole-wheat tortilla","",4,"whole-wheat tortillas"],
+  pitta:["whole-wheat pitta","",4,"whole-wheat pittas"], bagel:["whole-grain bagel","",4,"whole-grain bagels"],
+  rice:["microwave rice pouch","",4,"microwave rice pouches"], pasta:["whole-wheat pasta","g",4], oats:["oats","g",4],
+  granola:["granola","g",4], couscous:["couscous","g",4], noodles:["quick-cook noodles","g",4],
+  ricecake:["rice cake","",4,"rice cakes"],
+  tuna:["can of tuna","",5,"cans of tuna"], pb:["peanut butter","tbsp",5], hummus:["hummus","tbsp",5],
+  pesto:["pesto","tbsp",5], jam:["jam","tbsp",5], honey:["honey","tbsp",5], mayo:["light mayo","tbsp",5],
+  salsa:["salsa","tbsp",5], soy:["soy sauce","tbsp",5], curry:["curry paste","tbsp",5], oil:["olive oil","tbsp",5],
+  sauce:["tomato pasta sauce","g",5], corn:["sweetcorn (can)","g",5], beans:["black beans (can)","g",5],
+  chickpeas:["chickpeas (can)","g",5], almonds:["almonds","g",5], taco:["taco seasoning","tsp",5]
+};
+// Calories per unit: per g or ml, per item, or per tbsp/tsp (matches each ingredient's unit above).
+const KC = {
+  chick_c:1.65, chick_r:1.10, mince:1.25, turkey:1.05, ham:1.15, salmon:270, fish:125, sausage:85,
+  milk:0.5, yogurt:0.95, egg:72, cheddar:4.0, cottage:0.98, feta:2.65,
+  banana:105, apple:95, orange:62, lemon:17, tomato:22, cucumber:45, pepper:30, onion:44, avocado:240,
+  sweetpot:200, salad:0.15, spinach:0.23, carrots:0.35, potatoes:0.77, grapes:0.69,
+  broccoli:0.35, stirfry:0.35, peas:0.8, berries:0.5, prawns:0.99,
+  bread:100, tortilla:140, pitta:170, bagel:250, rice:350, pasta:3.5, oats:3.8, granola:4.5, couscous:3.6, noodles:3.6, ricecake:35,
+  tuna:130, pb:95, hummus:35, pesto:80, jam:50, honey:64, mayo:50, salsa:10, soy:10, curry:30, oil:120,
+  sauce:0.6, corn:0.85, beans:0.95, chickpeas:1.2, almonds:5.8, taco:8
+};
+const kcalOf = ([k, q]) => Math.round(KC[k] * q);
+const N = {
+  pro:["Protein","builds and repairs muscle after training."],
+  carb:["Energy carbs","fuel for training and school."],
+  fib:["Fiber","keeps you full and your gut healthy."],
+  fat:["Healthy fats","for hormones, skin and taking in vitamins."],
+  ca:["Calcium","strong bones while you grow."],
+  fe:["Iron","carries oxygen to your muscles so you don't get tired."],
+  vc:["Vitamin C","skin, healing and fighting colds. Helps you absorb iron."],
+  o3:["Omega-3","heart, brain and skin."]
+};
+const NORDER = Object.keys(N);
+
+// Recipes: t time, k kcal, p protein (g), i ingredients [key, qty], h how-to, n nutrients
+const R = {
+  b1:{name:"Overnight oats",t:"5 min, night before",k:550,p:26,i:[["oats",60],["milk",200],["yogurt",100],["banana",1]],h:"Mix oats, milk and yogurt in a jar. Fridge overnight. Slice the banana on top in the morning.",n:["pro","carb","fib","ca","fe"]},
+  b2:{name:"Scrambled eggs on toast",t:"8 min",k:505,p:26,i:[["egg",3],["bread",2],["apple",1]],h:"Whisk eggs with a pinch of salt. Cook in a non-stick pan on medium for 3 min, stirring. Toast the bread.",n:["pro","carb","fib","fe"]},
+  b3:{name:"Peanut butter banana toast",t:"3 min",k:565,p:22,i:[["bread",2],["pb",1.5],["banana",1],["milk",250]],h:"Toast the bread, spread peanut butter, slice banana on top. Glass of milk on the side.",n:["pro","carb","fib","ca","fat"]},
+  b4:{name:"Yogurt berry bowl",t:"2 min",k:510,p:24,i:[["yogurt",200],["granola",40],["berries",150],["honey",1]],h:"Yogurt in a bowl. Thaw berries 1 min in the microwave, add on top with granola and honey.",n:["pro","ca","vc","fib"]},
+  b5:{name:"Banana oat smoothie",t:"3 min",k:565,p:27,i:[["milk",300],["yogurt",100],["banana",1],["oats",30],["pb",1]],h:"Blend everything for 30 seconds.",n:["pro","carb","ca","fat"]},
+  b6:{name:"Egg & cheese bagel",t:"8 min",k:530,p:28,i:[["bagel",1],["egg",2],["cheddar",20],["orange",1]],h:"Toast the bagel. Fry or scramble the eggs 3 min, put cheese on top to melt, then into the bagel.",n:["pro","carb","ca","fe","vc"]},
+  b7:{name:"Cottage cheese toast",t:"3 min",k:470,p:30,i:[["bread",2],["cottage",150],["tomato",1],["apple",1]],h:"Toast the bread, spread cottage cheese, add sliced tomato, salt and pepper.",n:["pro","ca","fib","vc"]},
+  b8:{name:"Microwave mug omelette",t:"4 min",k:500,p:33,i:[["egg",3],["spinach",30],["cheddar",20],["bread",2]],h:"Whisk eggs in a big mug with spinach and cheese. Microwave 1 min, stir, then 45 s more. Toast on the side.",n:["pro","fe","ca","fib"]},
+  b9:{name:"Hot berry peanut oatmeal",t:"4 min",k:560,p:18,i:[["oats",60],["milk",250],["pb",1],["berries",100],["honey",1]],h:"Microwave oats and milk 2 min, stir. Top with berries, peanut butter and honey.",n:["carb","fib","ca","vc","fat","fe"]},
+  b10:{name:"Breakfast burrito",t:"8 min",k:545,p:28,i:[["tortilla",1],["egg",2],["beans",60],["cheddar",20],["salsa",2],["banana",1]],h:"Scramble eggs 3 min, add beans to warm. Fill the tortilla with eggs, cheese and salsa, roll it up. Banana on the side.",n:["pro","fib","fe","ca"]},
+  b11:{name:"Banana split yogurt",t:"2 min",k:535,p:25,i:[["yogurt",200],["banana",1],["pb",1],["granola",30]],h:"Split the banana in a bowl, add yogurt, drizzle peanut butter, sprinkle granola.",n:["pro","ca","fat","carb"]},
+  b12:{name:"Ham & cheese toastie",t:"6 min",k:550,p:34,i:[["bread",2],["ham",60],["cheddar",30],["orange",1],["milk",200]],h:"Ham and cheese between the bread. Toast in a pan 2–3 min each side. Orange and milk on the side.",n:["pro","ca","vc","carb"]},
+  b13:{name:"PB & honey overnight oats",t:"5 min, night before",k:535,p:22,i:[["oats",60],["milk",200],["yogurt",50],["pb",1],["honey",1]],h:"Mix everything in a jar. Fridge overnight. Eat cold.",n:["carb","fib","ca","fat","fe"]},
+  b14:{name:"Banana oat pancakes",t:"10 min",k:555,p:27,i:[["banana",1],["egg",2],["oats",40],["yogurt",100],["honey",1]],h:"Blend banana, eggs and oats. Cook small pancakes in a non-stick pan, 1–2 min each side. Top with yogurt and honey.",n:["pro","carb","ca","fe","fib"]},
+  l1:{name:"Chicken hummus wraps",t:"Pack in 5 min",k:650,p:40,i:[["tortilla",2],["chick_c",120],["hummus",2],["salad",20],["tomato",1],["apple",1]],h:"Spread hummus on the tortillas, add chicken, salad and tomato. Roll tight, wrap in foil.",n:["pro","carb","fib","vc"]},
+  l2:{name:"Tuna pasta salad",t:"10 min, night before",k:585,p:42,i:[["pasta",80],["tuna",1],["corn",60],["mayo",1],["cucumber",0.5],["orange",1]],h:"Boil pasta 10 min, rinse cold. Mix with tuna, corn, chopped cucumber and mayo. Pack in a tub.",n:["pro","carb","o3","vc"]},
+  l3:{name:"Turkey cheese sandwich",t:"Pack in 5 min",k:575,p:30,i:[["bread",2],["turkey",80],["cheddar",20],["spinach",20],["tomato",1],["mayo",1],["carrots",80],["banana",1]],h:"Build the sandwich with spinach and tomato. Carrots and banana in the bag.",n:["pro","fib","ca","fe","vc"]},
+  l4:{name:"Chicken pesto pasta salad",t:"12 min, night before",k:585,p:37,i:[["pasta",80],["chick_c",100],["pesto",1.5],["tomato",1],["spinach",30]],h:"Boil pasta 10 min, rinse cold. Stir in pesto, chicken, chopped tomato and spinach. Tastes good cold.",n:["pro","carb","fat","vc","fe"]},
+  l5:{name:"Bean & cheese quesadilla",t:"8 min, night before",k:620,p:25,i:[["tortilla",2],["beans",100],["cheddar",30],["salsa",2],["pepper",0.5],["apple",1]],h:"Mash beans on one tortilla, add cheese, top with the other. Pan 2 min each side. Cool, cut in wedges. Pepper strips and salsa in a small tub.",n:["pro","fib","fe","ca","vc"]},
+  l6:{name:"Chickpea tuna pitta",t:"Pack in 5 min",k:610,p:40,i:[["chickpeas",120],["tuna",1],["cucumber",0.5],["tomato",1],["feta",30],["oil",0.5],["pitta",1]],h:"Mix chickpeas, tuna, chopped cucumber, tomato, feta and oil in a tub. Pitta on the side to stuff at lunch.",n:["pro","fib","fe","o3","fat"]},
+  l7:{name:"Ham & cheese pittas",t:"Pack in 4 min",k:575,p:30,i:[["pitta",2],["ham",80],["cheddar",20],["salad",20],["orange",1]],h:"Stuff the pittas with ham, cheese and salad. Orange in the bag.",n:["pro","carb","ca","vc"]},
+  l8:{name:"Egg salad sandwich",t:"Pack in 5 min",k:595,p:30,i:[["egg",3],["mayo",1],["bread",2],["salad",15],["carrots",80],["banana",1]],h:"Mash boiled eggs with mayo, salt and pepper. Spread on bread with salad. Carrots and banana in the bag.",n:["pro","fe","fib","fat"]},
+  l9:{name:"Cold peanut noodle salad",t:"8 min, night before",k:605,p:40,i:[["noodles",70],["chick_c",100],["pb",1],["soy",1],["cucumber",0.5],["pepper",0.5],["orange",1]],h:"Cook noodles, rinse cold. Mix peanut butter, soy and 1 tbsp hot water into a sauce. Toss with noodles, chicken, cucumber and pepper.",n:["pro","carb","fat","vc"]},
+  l10:{name:"Chicken couscous box",t:"6 min, night before",k:630,p:38,i:[["couscous",70],["chick_c",100],["cucumber",0.5],["tomato",1],["hummus",2],["banana",1]],h:"Pour boiling water over couscous, cover 5 min, fluff. Top with chicken, cucumber, tomato and hummus.",n:["pro","carb","fib","vc","fat"]},
+  l11:{name:"Turkey hummus wraps",t:"Pack in 5 min",k:615,p:32,i:[["tortilla",2],["turkey",80],["hummus",2],["cheddar",20],["pepper",0.5],["salad",15],["apple",1]],h:"Spread hummus, add turkey, cheese, pepper strips and salad. Roll tight, wrap in foil.",n:["pro","fib","vc","ca"]},
+  l12:{name:"Protein snack box",t:"Pack in 5 min",k:615,p:37,i:[["egg",2],["cheddar",30],["ham",50],["ricecake",3],["grapes",100],["carrots",80],["almonds",15]],h:"Boiled eggs, cheese cubes, rolled ham, rice cakes, grapes, carrots and almonds in a lunch box.",n:["pro","ca","fe","fat","fib"]},
+  l13:{name:"Chicken avocado sandwich",t:"Pack in 5 min",k:585,p:43,i:[["bread",2],["chick_c",100],["avocado",0.25],["cheddar",20],["salad",15],["tomato",1],["orange",1]],h:"Mash avocado on the bread (a squeeze of lemon stops it browning), add chicken, cheese, salad and tomato.",n:["pro","fat","fib","vc","ca"]},
+  l14:{name:"Tuna mayo bagel",t:"Pack in 5 min",k:600,p:40,i:[["bagel",1],["tuna",1],["mayo",1],["cheddar",20],["carrots",80],["orange",1]],h:"Mix tuna and mayo, fill the bagel with it and the cheese. Carrots and orange in the bag.",n:["pro","o3","ca","vc","carb"]},
+  d1:{name:"Sheet-pan chicken & potatoes",t:"30 min (5 min work)",k:585,p:45,i:[["chick_r",150],["potatoes",300],["broccoli",200],["oil",1]],h:"Cube the chicken, halve the potatoes. Toss everything on a tray with oil, salt, pepper and paprika. Oven 200 °C for 25 min.",n:["pro","carb","vc","fib","fat"]},
+  d2:{name:"Pasta with meat sauce",t:"15 min",k:645,p:40,i:[["pasta",100],["mince",100],["sauce",150],["cheddar",20]],h:"Boil pasta 10 min. Brown the mince in a pan 5 min, add sauce, heat through. Mix, cheese on top.",n:["pro","carb","fe","ca"]},
+  d3:{name:"Salmon, rice & broccoli",t:"20 min",k:670,p:38,i:[["salmon",1],["rice",1],["broccoli",150],["lemon",0.25]],h:"Oven the salmon at 200 °C for 15 min with salt and lemon. Microwave rice and broccoli while it cooks.",n:["pro","o3","carb","vc","fat"]},
+  d4:{name:"Chicken stir-fry",t:"15 min",k:685,p:46,i:[["chick_r",150],["stirfry",250],["soy",2],["oil",0.5],["rice",1]],h:"Fry chicken strips in oil 6 min, add veg for 4 min, then soy sauce. Serve on microwaved rice.",n:["pro","carb","vc","fib"]},
+  d5:{name:"Beef tacos",t:"15 min",k:610,p:42,i:[["tortilla",2],["mince",120],["taco",1],["cheddar",30],["salsa",2],["salad",20],["avocado",0.25]],h:"Brown mince with taco seasoning 6 min. Fill tortillas with mince, cheese, salsa, salad and avocado.",n:["pro","fe","ca","fat"]},
+  d6:{name:"Sausage, mash & peas",t:"25 min",k:600,p:35,i:[["sausage",3],["potatoes",300],["peas",100],["milk",50]],h:"Boil potatoes 15 min. Pan or oven the sausages 15 min. Mash potatoes with milk. Microwave peas 3 min.",n:["pro","carb","fib","vc"]},
+  d7:{name:"Loaded sweet potato",t:"12 min",k:670,p:42,i:[["sweetpot",1],["chick_c",80],["beans",120],["cheddar",30],["salsa",2],["yogurt",50]],h:"Prick the potato with a fork, microwave 8–10 min. Split it open, fill with warmed beans, chicken, cheese, salsa and a spoon of yogurt.",n:["pro","fib","fe","vc","ca"]},
+  d8:{name:"Lemon fish & pesto couscous",t:"15 min",k:655,p:40,i:[["fish",1],["couscous",80],["peas",100],["oil",0.5],["pesto",1],["lemon",0.25]],h:"Oven the fish at 200 °C for 12 min with oil and lemon. Couscous with boiling water, 5 min. Microwave peas. Stir pesto into the couscous.",n:["pro","carb","fib","vc","fat"]},
+  d9:{name:"Quick chicken curry",t:"20 min",k:640,p:47,i:[["chick_r",150],["curry",2],["yogurt",50],["spinach",50],["rice",1]],h:"Fry chicken 6 min, add curry paste 1 min, a splash of water and the spinach. Off the heat, stir in yogurt. Serve with rice.",n:["pro","fe","carb","ca"]},
+  d10:{name:"Quick beef chili",t:"15 min",k:605,p:42,i:[["mince",120],["beans",100],["sauce",150],["taco",1],["rice",0.5],["cheddar",20]],h:"Brown mince with taco seasoning 5 min. Add beans and sauce, simmer 5 min. Serve on rice with cheese.",n:["pro","fe","fib","vc","ca"]},
+  d11:{name:"Prawn noodle stir-fry",t:"10 min",k:630,p:40,i:[["noodles",80],["prawns",120],["stirfry",200],["egg",1],["soy",2],["oil",0.5]],h:"Cook noodles. Fry veg in oil 3 min, add prawns 2 min, push aside and scramble the egg. Toss in noodles and soy sauce.",n:["pro","carb","vc","fe"]},
+  d12:{name:"Pitta pizzas",t:"12 min",k:610,p:33,i:[["pitta",2],["sauce",60],["cheddar",40],["ham",50],["pepper",0.5]],h:"Spread sauce on the pittas, add ham, pepper and cheese. Oven 200 °C for 8 min.",n:["pro","ca","vc","carb"]},
+  d13:{name:"Chicken fajita bowl",t:"15 min",k:645,p:45,i:[["chick_r",150],["pepper",1],["onion",0.5],["oil",0.5],["taco",1],["rice",1],["salsa",2]],h:"Slice chicken, pepper and onion. Fry in oil with taco seasoning 8 min. Serve on rice with salsa.",n:["pro","carb","vc","fib"]},
+  d14:{name:"Salmon pesto pasta",t:"15 min",k:670,p:40,i:[["pasta",90],["salmon",1],["pesto",1],["spinach",30]],h:"Boil pasta 10 min, add spinach for the last minute. Pan or oven the salmon 10 min, flake it in. Stir in pesto.",n:["pro","o3","fe","fat","carb"]},
+  s1:{name:"Yogurt & honey",t:"1 min",k:235,p:15,i:[["yogurt",150],["honey",1],["berries",50]],h:"Mix in a bowl.",n:["pro","ca"]},
+  s2:{name:"Apple & peanut butter",t:"1 min",k:235,p:6,i:[["apple",1],["pb",1.5]],h:"Slice the apple, dip in peanut butter.",n:["fib","fat"]},
+  s3:{name:"Banana & milk",t:"0 min",k:230,p:9,i:[["banana",1],["milk",250]],h:"Grab and go.",n:["ca","carb"]},
+  s4:{name:"Almonds & apple",t:"0 min",k:270,p:6,i:[["almonds",30],["apple",1]],h:"Grab and go.",n:["fat","fib"]},
+  s5:{name:"Peanut butter rice cakes",t:"1 min",k:210,p:7,i:[["ricecake",2],["pb",1.5]],h:"Spread and eat.",n:["fat","carb"]},
+  s6:{name:"Cottage cheese & berries",t:"1 min",k:230,p:18,i:[["cottage",150],["berries",100],["honey",0.5]],h:"Top cottage cheese with thawed berries and honey.",n:["pro","ca","vc"]},
+  s7:{name:"Hummus, carrots & pitta",t:"1 min",k:230,p:7,i:[["hummus",3],["carrots",100],["pitta",0.5]],h:"Dip and eat.",n:["fib","fe"]},
+  s8:{name:"Cheese, rice cakes & grapes",t:"1 min",k:245,p:9,i:[["cheddar",30],["ricecake",2],["grapes",80]],h:"Slice cheese onto rice cakes, grapes on the side.",n:["ca","carb"]},
+  s9:{name:"Boiled eggs & orange",t:"From your batch",k:235,p:13,i:[["egg",2],["orange",1],["ricecake",1]],h:"Use eggs from your Sunday batch.",n:["pro","vc","fe"]},
+  s10:{name:"Banana PB smoothie",t:"2 min",k:300,p:11,i:[["milk",200],["banana",1],["pb",1]],h:"Blend 30 seconds.",n:["ca","fat","carb"]},
+  s11:{name:"Granola & milk",t:"1 min",k:255,p:8,i:[["granola",40],["milk",150]],h:"Bowl, granola, milk.",n:["ca","carb"]},
+  s12:{name:"Grapes & cheese",t:"1 min",k:220,p:8,i:[["grapes",150],["cheddar",30]],h:"Grab and go.",n:["ca"]},
+  s13:{name:"PB & jam rice cakes",t:"1 min",k:215,p:5,i:[["ricecake",2],["pb",1],["jam",1]],h:"Spread and eat.",n:["carb","fat"]},
+  s14:{name:"Ham & cheese roll-ups",t:"1 min",k:245,p:17,i:[["ham",60],["cheddar",20],["apple",1]],h:"Roll cheese strips in ham slices. Apple on the side.",n:["pro","ca"]},
+  r1:{name:"Greek yogurt & honey",t:"1 min",k:200,p:17,i:[["yogurt",170],["honey",0.5]],h:"Stir honey into the yogurt.",n:["pro","ca"]},
+  r2:{name:"Milk & rice cakes",t:"1 min",k:220,p:12,i:[["milk",300],["ricecake",2]],h:"Big glass of milk, rice cakes on the side.",n:["pro","ca","carb"]},
+  r3:{name:"Eggs & rice cakes",t:"From your batch",k:210,p:13,i:[["egg",2],["ricecake",2]],h:"Sliced boiled eggs on rice cakes, pinch of salt.",n:["pro","fe"]},
+  r4:{name:"Cottage cheese & grapes",t:"1 min",k:185,p:18,i:[["cottage",150],["grapes",50]],h:"Grab and go.",n:["pro","ca"]},
+  r5:{name:"Turkey & cheese stack",t:"1 min",k:185,p:18,i:[["turkey",60],["cheddar",20],["ricecake",1]],h:"Stack turkey and cheese on a rice cake.",n:["pro","ca"]},
+  r6:{name:"Tuna rice cakes",t:"2 min",k:225,p:29,i:[["tuna",1],["mayo",0.5],["ricecake",2]],h:"Mix tuna with mayo, spread on rice cakes.",n:["pro","o3"]},
+  r7:{name:"Yogurt & granola",t:"1 min",k:240,p:16,i:[["yogurt",150],["granola",20]],h:"Granola on top of yogurt.",n:["pro","ca","carb"]},
+  r8:{name:"Berry milk smoothie",t:"2 min",k:225,p:15,i:[["milk",250],["berries",100],["yogurt",50]],h:"Blend 30 seconds.",n:["pro","ca","vc"]},
+  r9:{name:"Chicken hummus rice cakes",t:"2 min",k:205,p:20,i:[["chick_c",60],["hummus",1],["ricecake",2]],h:"Hummus on rice cakes, chicken on top.",n:["pro","fib"]},
+  r10:{name:"Ham & cheese rice cakes",t:"1 min",k:210,p:17,i:[["ham",50],["cheddar",20],["ricecake",2]],h:"Ham and cheese on rice cakes.",n:["pro","ca"]},
+  r11:{name:"Cottage cheese & cucumber",t:"2 min",k:230,p:19,i:[["cottage",150],["cucumber",0.5],["ricecake",2]],h:"Cottage cheese on rice cakes, cucumber slices on top.",n:["pro","ca"]},
+  r12:{name:"Spinach egg mug & toast",t:"3 min",k:245,p:17,i:[["egg",2],["spinach",20],["bread",1]],h:"Whisk eggs with spinach in a mug, microwave 1 min, stir, 30 s more. Toast on the side.",n:["pro","fe","fib"]},
+  r13:{name:"Milk & almonds",t:"0 min",k:240,p:13,i:[["milk",300],["almonds",15]],h:"Grab and go.",n:["pro","ca","fat"]},
+  r14:{name:"Yogurt & berries",t:"1 min",k:200,p:17,i:[["yogurt",170],["berries",60]],h:"Thaw berries 1 min, put on yogurt.",n:["pro","ca","vc"]}
+};
+// Prep: [storage type, storage note, steps]. cold = keep in fridge, eat = make and eat now, shelf = no fridge needed.
+const P = {
+  b1:["cold","Fridge overnight. Keeps 3 days.",["Put 60 g oats in a jar or tub with a lid.","Pour in 200 ml milk and add 100 g Greek yogurt. Stir well.","Close the lid and put it in the fridge overnight (at least 6 hours).","In the morning, stir, slice the banana on top and eat cold."]],
+  b2:["eat","Eat hot. Eggs live in the fridge.",["Crack 3 eggs into a bowl, add a pinch of salt, whisk with a fork.","Put the bread in the toaster.","Heat a non-stick pan on medium and pour in the eggs.","Stir slowly with a spatula for 2–3 min until just set, then take off the heat.","Eggs on toast. Apple on the side."]],
+  b3:["eat","Ready in 3 min. Milk back in the fridge.",["Toast 2 slices of bread.","Spread 1½ tbsp peanut butter over both slices.","Slice the banana and lay it on top.","Pour a 250 ml glass of milk."]],
+  b4:["eat","Eat now. Yogurt in the fridge, berries in the freezer.",["Spoon 200 g yogurt into a bowl.","Microwave 150 g frozen berries in a cup for 1 min to thaw.","Pour the berries on the yogurt.","Top with 40 g granola and 1 tbsp honey."]],
+  b5:["eat","Drink straight away.",["Peel the banana and break it into the blender.","Add 300 ml milk, 100 g yogurt, 30 g oats and 1 tbsp peanut butter.","Blend 30–45 seconds until smooth.","Pour into a glass and drink."]],
+  b6:["eat","Eat hot.",["Slice the bagel in half and toast it.","Heat a non-stick pan on medium and crack in 2 eggs.","Cook 3 min (flip them if you like the yolk firm).","Put 20 g cheese on the eggs for the last 30 seconds to melt.","Stack the eggs in the bagel. Orange on the side."]],
+  b7:["eat","Eat now. Open cottage cheese keeps 5 days in the fridge.",["Toast 2 slices of bread.","Spread 150 g cottage cheese over the toast.","Slice the tomato and lay it on top.","Add a pinch of salt and pepper. Apple on the side."]],
+  b8:["eat","Eat hot.",["Crack 3 eggs into a big microwave-safe mug and whisk with a fork.","Stir in a handful (30 g) of spinach and 20 g grated cheese.","Microwave 1 min, stir, then microwave 45 s more until set.","Toast 2 slices of bread while it cooks."]],
+  b9:["eat","Eat hot.",["Put 60 g oats and 250 ml milk in a big microwave-safe bowl.","Microwave 2 min, stir, then 30 s more if it's still runny.","Top with 100 g frozen berries (they thaw in the hot oats).","Add 1 tbsp peanut butter and 1 tbsp honey."]],
+  b10:["eat","Eat hot.",["Whisk 2 eggs and scramble them in a non-stick pan on medium for 2 min.","Add 60 g drained black beans and stir 1 min to warm.","Lay the tortilla flat. Add the eggs, 20 g cheese and 2 tbsp salsa.","Fold in the sides and roll it up. Banana on the side."]],
+  b11:["eat","Eat now.",["Peel the banana and split it lengthways in a bowl.","Spoon 200 g yogurt over it.","Drizzle 1 tbsp peanut butter (microwave it 10 s to make it runny).","Sprinkle 30 g granola on top."]],
+  b12:["eat","Eat hot.",["Put 60 g ham and 30 g cheese between 2 slices of bread.","Heat a dry non-stick pan on medium.","Toast the sandwich 2–3 min per side, pressing down with a spatula, until golden and melty.","Cut in half. Orange and a 200 ml glass of milk on the side."]],
+  b13:["cold","Fridge overnight. Keeps 3 days.",["Put 60 g oats in a jar with a lid.","Add 200 ml milk, 50 g yogurt, 1 tbsp peanut butter and 1 tbsp honey.","Stir well, close and put in the fridge overnight.","Stir in the morning and eat cold."]],
+  b14:["eat","Eat warm. Leftover pancakes keep 2 days in the fridge.",["Blend the banana, 2 eggs and 40 g oats until smooth (or mash well with a fork).","Heat a non-stick pan on medium with a few drops of oil.","Pour small pancakes, 2 tbsp of batter each. Cook 1–2 min until bubbles show, flip, then 1 min more.","Top with 100 g yogurt and 1 tbsp honey."]],
+  l1:["cold","Make the night before. Fridge, then an ice pack in your bag.",["Lay the 2 tortillas flat and spread 1 tbsp hummus on each.","Add 60 g cooked chicken to each, then salad and sliced tomato.","Fold the bottom up, fold in the sides and roll tight.","Wrap each in foil or cling film and put in the fridge overnight.","Morning: into your lunch bag with an ice pack. Apple loose in the bag."]],
+  l2:["cold","Keeps 2 days in the fridge. Ice pack in your bag.",["Boil a pan of water, add 80 g pasta and cook 10 min.","Drain, then rinse under cold water until cool.","Drain the tuna and chop the half cucumber.","Mix the pasta, tuna, 60 g sweetcorn, cucumber and 1 tbsp mayo in a lunch tub.","Lid on, fridge overnight. Morning: lunch bag with an ice pack. Orange in the bag."]],
+  l3:["cold","Make the night before. Ice pack in your bag.",["Spread 1 tbsp mayo on one slice of bread.","Add 80 g turkey, 20 g cheese, the spinach and sliced tomato. Top with the other slice.","Cut in half and wrap in foil or a sandwich box. Fridge overnight.","Put 80 g carrots in a small bag.","Morning: sandwich and carrots in your lunch bag with an ice pack. Banana on top."]],
+  l4:["cold","Keeps 2 days in the fridge. Ice pack in your bag.",["Boil 80 g pasta for 10 min, then drain and rinse cold.","Stir in 1½ tbsp pesto.","Add 100 g cooked chicken, the chopped tomato and 30 g spinach. Mix.","Put it in a lunch tub, lid on, fridge overnight.","Morning: lunch bag with an ice pack."]],
+  l5:["cold","Fridge overnight. Fine cold at lunch with an ice pack.",["Mash 100 g drained beans with a fork.","Spread them on one tortilla, sprinkle 30 g cheese and top with the second tortilla.","Cook in a dry pan on medium for 2 min per side until the cheese melts.","Let it cool for 10 min, cut into wedges and put in a tub. Fridge overnight.","Pack pepper strips and 2 tbsp salsa in a small tub. Apple in the bag."]],
+  l6:["cold","Keeps 2 days in the fridge. Ice pack in your bag.",["Drain and rinse 120 g chickpeas. Drain the tuna.","Chop the half cucumber and the tomato into small pieces.","Mix the chickpeas, tuna, veg, 30 g crumbled feta, ½ tbsp olive oil and a pinch of salt in a tub.","Lid on, fridge overnight.","Pack the pitta in a separate bag so it doesn't go soggy. Stuff it at lunch."]],
+  l7:["cold","Make the night before. Ice pack in your bag.",["Cut the top off each pitta and open them into pockets.","Stuff each with 40 g ham, 10 g cheese and some salad.","Wrap in foil and put in the fridge overnight.","Morning: lunch bag with an ice pack. Orange in the bag."]],
+  l8:["cold","Egg salad keeps 2 days in the fridge. Always use an ice pack.",["Use 3 eggs from your Sunday batch (or boil them for 10 min, then cool in cold water).","Peel them, mash with a fork and mix in 1 tbsp mayo, salt and pepper.","Spread on the bread, add salad and close the sandwich.","Wrap and put in the fridge overnight.","Morning: lunch bag with an ice pack. Carrots and banana in the bag."]],
+  l9:["cold","Keeps 2 days in the fridge. Ice pack in your bag.",["Cook 70 g noodles as the pack says (about 4 min), then drain and rinse cold.","Mix 1 tbsp peanut butter, 1 tbsp soy sauce and 1 tbsp hot water into a smooth sauce.","Slice the half cucumber and half pepper into thin strips.","Toss the noodles, sauce, veg and 100 g cooked chicken in a tub.","Fridge overnight. Morning: lunch bag with an ice pack. Orange in the bag."]],
+  l10:["cold","Keeps 2 days in the fridge. Ice pack in your bag.",["Put 70 g couscous in a bowl and pour over 100 ml boiling water.","Cover with a plate for 5 min, then fluff with a fork.","Chop the half cucumber and the tomato.","Put the couscous in a tub and top with 100 g chicken, the veg and 2 tbsp hummus.","Fridge overnight. Morning: lunch bag with an ice pack. Banana in the bag."]],
+  l11:["cold","Make the night before. Ice pack in your bag.",["Spread 1 tbsp hummus on each tortilla.","Add 40 g turkey and 10 g cheese to each, plus pepper strips and salad.","Roll tight and wrap in foil.","Fridge overnight. Morning: lunch bag with an ice pack. Apple in the bag."]],
+  l12:["cold","Pack the night before. Ice pack in your bag.",["Take 2 boiled eggs from your Sunday batch (keep the shells on so they stay fresh).","Cut 30 g cheese into cubes and roll up 50 g ham.","Put the eggs, cheese, ham, grapes, carrots and 15 g almonds in a lunch box with sections.","Put 3 rice cakes in a separate bag so they stay crunchy.","Fridge overnight. Morning: lunch bag with an ice pack."]],
+  l13:["cold","Make the night before. Ice pack in your bag.",["Mash ¼ avocado with a squeeze of lemon (it stops it going brown).","Spread it on one slice of bread.","Add 100 g chicken, 20 g cheese, salad and sliced tomato. Close the sandwich.","Wrap it tight and put in the fridge overnight.","Morning: lunch bag with an ice pack. Orange in the bag."]],
+  l14:["cold","Make the night before. Ice pack in your bag.",["Drain the tuna and mix it with 1 tbsp mayo, salt and pepper.","Slice the bagel in half, spread the tuna on and add 20 g cheese.","Close it, wrap in foil and put in the fridge overnight.","Put 80 g carrots in a small bag.","Morning: lunch bag with an ice pack. Orange in the bag."]],
+  d1:["eat","Eat hot. Leftovers keep 3 days in the fridge.",["Turn the oven on to 200 °C.","Cut 150 g chicken into cubes and halve 300 g baby potatoes.","Put the chicken, potatoes and 200 g frozen broccoli on a tray.","Drizzle 1 tbsp olive oil, add salt, pepper and paprika, and toss with your hands. Wash your hands after touching raw chicken.","Bake 25 min until the potatoes are soft and the chicken is white all the way through."]],
+  d2:["eat","Eat hot. Leftovers keep 3 days in the fridge and make a good lunch.",["Boil a pan of salted water, add 100 g pasta and cook 10 min.","Meanwhile, brown 100 g mince in a pan on medium-high for 5 min, breaking it up.","Pour in 150 g pasta sauce and heat 2–3 min.","Drain the pasta and mix it with the sauce.","Top with 20 g grated cheese."]],
+  d3:["eat","Eat hot. Cooked salmon keeps 2 days in the fridge.",["Turn the oven on to 200 °C.","Put the salmon on foil on a tray, add salt and a squeeze of lemon.","Bake 12–15 min until it flakes easily with a fork.","While it bakes, microwave 150 g broccoli for 3 min and the rice pouch for 2 min.","Plate up."]],
+  d4:["eat","Eat hot. Leftovers keep 3 days in the fridge.",["Cut 150 g chicken into thin strips.","Heat ½ tbsp oil in a big pan on high. Fry the chicken 6 min until white all the way through.","Add 250 g frozen stir-fry veg and cook 4 min, stirring.","Add 2 tbsp soy sauce and stir.","Microwave the rice pouch for 2 min and serve the stir-fry on top."]],
+  d5:["eat","Eat hot. Cooked mince keeps 3 days in the fridge.",["Brown 120 g mince in a pan on medium-high for 5–6 min.","Stir in 1 tsp taco seasoning and a splash of water and cook 1 min.","Warm the tortillas in the microwave for 20 s.","Fill with the mince, 30 g cheese, 2 tbsp salsa, salad and sliced avocado."]],
+  d6:["eat","Eat hot. Leftovers keep 3 days in the fridge.",["Boil 300 g potatoes in salted water for 15 min, until a knife slides in.","At the same time, cook 3 sausages in a pan on medium for 12–15 min, turning them.","Microwave 100 g peas for 3 min.","Drain the potatoes, add 50 ml milk and mash with a fork or masher.","Plate the sausages, mash and peas."]],
+  d7:["eat","Eat hot. Leftovers keep 2 days in the fridge.",["Wash the sweet potato and prick it all over with a fork.","Microwave 8–10 min, turning halfway, until soft.","Warm 120 g beans and 80 g chicken in the microwave for 1 min.","Split the potato open and fill it with the beans and chicken.","Top with 30 g cheese, 2 tbsp salsa and 50 g yogurt."]],
+  d8:["eat","Eat hot. Cooked fish keeps 2 days in the fridge.",["Turn the oven on to 200 °C. Put the fish on foil, drizzle ½ tbsp oil and add salt and lemon.","Bake 12 min until it flakes.","Put 80 g couscous in a bowl with 110 ml boiling water. Cover for 5 min, then fluff.","Microwave 100 g peas for 3 min.","Stir 1 tbsp pesto and the peas into the couscous. Fish on top."]],
+  d9:["eat","Eat hot. Leftovers keep 3 days in the fridge.",["Cut 150 g chicken into bite-size pieces.","Fry in a little oil on medium-high for 6 min until white all the way through.","Stir in 2 tbsp curry paste for 1 min.","Add a splash of water and 50 g spinach and stir until the spinach wilts.","Take it off the heat and stir in 50 g yogurt. Serve with the microwaved rice pouch."]],
+  d10:["eat","Eat hot. Chili keeps 3 days in the fridge or 3 months in the freezer.",["Brown 120 g mince in a pan for 5 min with 1 tsp taco seasoning.","Add 100 g drained beans and 150 g pasta sauce.","Simmer 5 min, stirring now and then.","Microwave half the rice pouch. Fridge the other half and eat it within 1 day.","Serve the chili on rice with 20 g cheese."]],
+  d11:["eat","Eat hot. Leftovers keep 1 day in the fridge.",["Thaw 120 g prawns in a bowl of cold water for 10 min, then drain.","Cook 80 g noodles as the pack says and drain.","Heat ½ tbsp oil in a big pan on high and fry 200 g frozen veg for 3 min.","Add the prawns for 2 min. Push everything to one side, crack in the egg and scramble it.","Add the noodles and 2 tbsp soy sauce and toss everything together."]],
+  d12:["eat","Eat hot.",["Turn the oven on to 200 °C.","Lay 2 pittas on a tray and spread 30 g sauce on each.","Add the ham, sliced pepper and 40 g grated cheese.","Bake 8 min until the cheese bubbles."]],
+  d13:["eat","Eat hot. Leftovers keep 3 days in the fridge.",["Slice 150 g chicken, 1 pepper and half an onion into strips.","Heat ½ tbsp oil in a pan on high and add the chicken and veg.","Sprinkle in 1 tsp taco seasoning and fry 8 min until the chicken is cooked through.","Microwave the rice pouch for 2 min.","Serve the fajita mix on rice with 2 tbsp salsa."]],
+  d14:["eat","Eat hot. Leftovers keep 2 days in the fridge.",["Boil 90 g pasta for 10 min. Add 30 g spinach for the last minute.","At the same time, cook the salmon in a pan on medium for 4–5 min per side (or oven at 200 °C for 12 min).","Drain the pasta and spinach.","Flake the salmon into the pasta with a fork.","Stir in 1 tbsp pesto."]],
+  s1:["eat","Eat now.",["Spoon 150 g yogurt into a bowl.","Add a handful of berries (microwave 30 s to thaw).","Drizzle 1 tbsp honey."]],
+  s2:["shelf","No fridge needed. Good for your school bag.",["Wash and slice the apple.","Put 1½ tbsp peanut butter in a small tub for dipping."]],
+  s3:["eat","Eat now. Milk back in the fridge.",["Pour a 250 ml glass of milk.","Eat the banana with it."]],
+  s4:["shelf","No fridge needed. Good for your school bag.",["Put 30 g almonds (a big handful) in a small bag.","Grab an apple."]],
+  s5:["shelf","No fridge needed.",["Spread 1½ tbsp peanut butter over 2 rice cakes."]],
+  s6:["eat","Eat now. Open cottage cheese keeps 5 days in the fridge.",["Spoon 150 g cottage cheese into a bowl.","Microwave 100 g berries for 1 min to thaw and add them on top.","Drizzle ½ tbsp honey."]],
+  s7:["cold","Open hummus keeps 5–7 days in the fridge.",["Spoon 3 tbsp hummus into a small bowl or tub.","Grab 100 g baby carrots.","Cut half a pitta into strips (toast it if you like)."]],
+  s8:["shelf","Cheese is fine out of the fridge for up to 2 hours.",["Slice 30 g cheese.","Lay it on 2 rice cakes.","Grapes on the side."]],
+  s9:["cold","Boiled eggs keep 1 week in the fridge in their shells.",["Take 2 boiled eggs from your Sunday batch and peel them.","Add a pinch of salt.","Peel the orange. Rice cake on the side."]],
+  s10:["eat","Drink straight away.",["Put the banana, 200 ml milk and 1 tbsp peanut butter in the blender.","Blend 30 seconds and drink."]],
+  s11:["eat","Eat now.",["Pour 40 g granola into a bowl.","Add 150 ml milk."]],
+  s12:["shelf","Fine out of the fridge for up to 2 hours.",["Wash 150 g grapes.","Cut 30 g cheese into cubes."]],
+  s13:["shelf","No fridge needed.",["Spread 1 tbsp peanut butter over 2 rice cakes.","Add 1 tbsp jam on top."]],
+  s14:["cold","Keep cold. Open ham keeps 3–5 days in the fridge.",["Cut 20 g cheese into sticks.","Roll each stick in a slice of ham (60 g in total).","Apple on the side."]],
+  r1:["cold","Take it to practice with an ice pack, or eat it when you get home.",["Spoon 170 g yogurt into a tub.","Stir in ½ tbsp honey.","Lid on, into your bag with the ice pack."]],
+  r2:["cold","Milk needs the fridge. Have it when you get home.",["Pour a big 300 ml glass of milk.","Eat 2 rice cakes with it."]],
+  r3:["cold","Boiled eggs keep 1 week in the fridge in their shells.",["Take 2 boiled eggs from your Sunday batch, then peel and slice them.","Lay them on 2 rice cakes with a pinch of salt."]],
+  r4:["cold","Keep cold. Use an ice pack if you take it to practice.",["Spoon 150 g cottage cheese into a tub.","Add 50 g grapes."]],
+  r5:["cold","Keep cold. Use an ice pack if you take it to practice.",["Fold 60 g turkey and 20 g cheese.","Stack them on a rice cake."]],
+  r6:["eat","Make it fresh and eat right away.",["Drain the tuna and mix it with ½ tbsp mayo.","Spread it on 2 rice cakes."]],
+  r7:["cold","Keep cold. Use an ice pack if you take it to practice.",["Spoon 150 g yogurt into a tub.","Pack 20 g granola separately so it stays crunchy, and add it just before eating."]],
+  r8:["eat","Drink straight away.",["Put 250 ml milk, 100 g frozen berries and 50 g yogurt in the blender.","Blend 45 seconds until smooth."]],
+  r9:["cold","Keep cold. Use an ice pack if you take it to practice.",["Spread ½ tbsp hummus on each of 2 rice cakes.","Top with 60 g cooked chicken."]],
+  r10:["cold","Keep cold. Use an ice pack if you take it to practice.",["Put 25 g ham and 10 g cheese on each of 2 rice cakes."]],
+  r11:["cold","Keep cold. Eat it when you get home.",["Spread 150 g cottage cheese over 2 rice cakes.","Top with cucumber slices and a pinch of pepper."]],
+  r12:["eat","Eat hot, when you get home.",["Whisk 2 eggs in a mug with 20 g spinach.","Microwave 1 min, stir, then 30 s more.","Toast 1 slice of bread."]],
+  r13:["shelf","Almonds go anywhere. Have the milk when you get home.",["Pour a 300 ml glass of milk.","Eat 15 g almonds (a small handful) with it."]],
+  r14:["eat","Eat now.",["Microwave 60 g berries for 30 s to thaw.","Spoon them over 170 g yogurt."]]
+};
+const KEEP = { cold:"Fridge", eat:"Make & eat", shelf:"No fridge" };
+// Meal calories = the sum of its foods, so the numbers always add up.
+Object.values(R).forEach(m => { m.k = m.i.reduce((s, x) => s + kcalOf(x), 0); });
+
+// Batch prep: what to make at once, per week. feeds = [day index 0–13, recipe id].
+const B = [[
+  { t:"Boil eggs", n:[["egg",2]], when:"Sunday", time:"15 min", how:"Cover with cold water, bring to the boil, simmer 10 min, then cool in cold water.", keeps:"1 week in the shell", feeds:[[2,"r3"]] },
+  { t:"Shred cooked chicken", n:[["chick_c",220]], when:"Sunday", time:"10 min", how:"Pull the meat off a rotisserie chicken (or open cooked strips) into a tub.", keeps:"3–4 days", feeds:[[0,"l1"],[3,"l4"]] },
+  { t:"Freeze raw chicken portions", n:[["chick_r",300]], when:"Sunday", time:"10 min", how:"Cut into 150 g portions, season, bag each one and freeze. Move a bag to the fridge the night before.", keeps:"3 months frozen, 1–2 days once thawed", feeds:[[0,"d1"],[3,"d4"]] },
+  { t:"Cook pasta for 2 lunches", n:[["pasta",160]], when:"Monday night", time:"12 min", how:"Boil and rinse cold. Make Tuesday's lunch with half, keep half plain in the fridge for Thursday.", keeps:"3–4 days", feeds:[[1,"l2"],[3,"l4"]] },
+  { t:"Brown mince for 2 dinners", n:[["mince",220]], when:"Tuesday dinner", time:"6 min", how:"Brown it all. Use 100 g tonight and fridge 120 g for Friday's tacos.", keeps:"3 days", feeds:[[1,"d2"],[4,"d5"]] },
+  { t:"Snack bags", n:[["almonds",30],["carrots",80],["grapes",80]], when:"Sunday", time:"5 min", how:"Weigh into small bags. Carrots and grapes go in the fridge.", keeps:"Carrots and grapes 4–5 days", feeds:[[1,"s4"],[2,"l3"],[4,"s8"]] }
+],[
+  { t:"Boil eggs", n:[["egg",7]], when:"Sunday", time:"15 min", how:"Cover with cold water, bring to the boil, simmer 10 min, then cool in cold water.", keeps:"1 week in the shell", feeds:[[7,"l8"],[10,"s9"],[11,"l12"]] },
+  { t:"Shred cooked chicken", n:[["chick_c",260]], when:"Sunday", time:"10 min", how:"Pull the meat off a rotisserie chicken (or open cooked strips) into a tub.", keeps:"3–4 days", feeds:[[8,"l9"],[8,"r9"],[9,"l10"]] },
+  { t:"Freeze raw chicken portions", n:[["chick_r",300]], when:"Sunday", time:"10 min", how:"Cut into 150 g portions, season, bag each one and freeze. Move a bag to the fridge the night before.", keeps:"3 months frozen, 1–2 days once thawed", feeds:[[8,"d9"],[12,"d13"]] },
+  { t:"Couscous for 2 meals", n:[["couscous",150]], when:"Monday dinner", time:"6 min", how:"Make it all with 210 ml boiling water. Use 80 g tonight and fridge the rest for Wednesday's lunch box.", keeps:"3 days", feeds:[[7,"d8"],[9,"l10"]] },
+  { t:"Double chili", n:[["mince",240],["beans",200],["sauce",300]], when:"Wednesday dinner", time:"15 min", how:"Make two portions. Eat one, freeze the other for a busy night.", keeps:"3 days in the fridge, 3 months frozen", feeds:[[9,"d10"]], spare:"d10" },
+  { t:"Snack bags", n:[["carrots",260],["grapes",250],["almonds",15]], when:"Sunday and Wednesday", time:"5 min", how:"Bag Monday–Wednesday on Sunday and the rest on Wednesday, so they stay fresh.", keeps:"Carrots and grapes 4–5 days", feeds:[[7,"l8"],[11,"l12"],[11,"s7"],[13,"s12"]] }
+]];
+const BMAP = {};
+B.forEach(wk => wk.forEach(b => b.feeds.forEach(([di, id]) => { BMAP[`${di}-${id}`] = b; })));
+const SN = ["s1","s4","s5","s2","s8","s11","s10","s14","s6","s3","s9","s7","s13","s12"];
+const DAYNAMES = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const DAYS = Array.from({length:14}, (_, i) => [`b${i+1}`,`l${i+1}`,`d${i+1}`,SN[i],`r${i+1}`]);
+const SLOTS = [["Breakfast","--b"],["Packed lunch","--l"],["Dinner","--d"],["Snack","--s"],["After training","--t"]];
+const FOODS = ["f-apple","f-broc","f-carrot","f-banana","f-egg","f-fish","f-avo","f-straw","f-leg","f-milk","f-cheese","f-tomato","f-orange","f-bread","f-bowl"];
+// Ingredient -> cartoon picture
+const PIC = {
+  oats:"f-bowl", rice:"f-bowl", pasta:"f-bowl", noodles:"f-bowl", couscous:"f-bowl", granola:"f-bowl",
+  bread:"f-bread", bagel:"f-bread", pitta:"f-bread", tortilla:"f-bread",
+  egg:"f-egg", chick_c:"f-leg", chick_r:"f-leg", sausage:"f-leg",
+  salmon:"f-fish", fish:"f-fish", tuna:"f-fish", prawns:"f-fish",
+  milk:"f-milk", yogurt:"f-milk", cheddar:"f-cheese", cottage:"f-cheese", feta:"f-cheese",
+  banana:"f-banana", apple:"f-apple", orange:"f-orange", berries:"f-straw", grapes:"f-straw",
+  tomato:"f-tomato", broccoli:"f-broc", stirfry:"f-broc", spinach:"f-broc", peas:"f-broc",
+  carrots:"f-carrot", avocado:"f-avo",
+  ricecake:"f-ricecake", pb:"f-jar", jam:"f-jar", honey:"f-jar"
+};
+
+const frac = q => {
+  const w = Math.floor(q), f = Math.round((q - w) * 4) / 4;
+  const fs = { 0.25:"¼", 0.5:"½", 0.75:"¾" }[f] || "";
+  return (w ? String(w) : "") + fs || "0";
+};
+const ingText = ([k, q]) => {
+  const [n, u, , pl] = C[k];
+  if (u === "g" || u === "ml") return `${q} ${u} ${n}`;
+  if (u === "tbsp" || u === "tsp") return `${frac(q)} ${u} ${n}`;
+  return `${frac(q)} ${q > 1 ? (pl || n) : n}`;
+};
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const amount = (k, q) => {
+  const u = C[k][1];
+  if (u === "g") return q >= 1000 ? `${+(q/1000).toFixed(2)} kg` : `${q} g`;
+  if (u === "ml") return q >= 1000 ? `${+(q/1000).toFixed(2)} L` : `${q} ml`;
+  if (u === "tbsp" || u === "tsp") return `${frac(q)} ${u}`;
+  return String(Math.ceil(q));
+};
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } };
+const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let mealTicks = load("meal-ticks-v4", {}), shopTicks = load("shop-ticks-v2", {});
+let dayPick = load("day-pick-v1", [0, 0]), shopWeek = load("shop-week-v1", 0);
+
+// Cartoon food: faint background pattern + a cluster on the overview.
+const use = (id, x, y, s, r, el) => {
+  el.insertAdjacentHTML("beforeend",
+    `<svg style="left:${x}%;top:${y}%;width:${s}px;height:${s}px;transform:rotate(${r}deg)" viewBox="0 0 64 64"><use href="#${id}"/></svg>`);
+};
+(() => {
+  const bg = document.getElementById("food-bg");
+  let k = 0;
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 8; c++) {
+    use(FOODS[k % FOODS.length], (c + (r % 2 ? .5 : 0)) / 8 * 100 + ((k * 37) % 7) - 3, r / 6 * 100 + 4 + ((k * 53) % 7) - 3, 40 + (k * 13) % 24, ((k * 29) % 40) - 20, bg);
+    k += 3;
+  }
+  const art = document.getElementById("art");
+  [["f-broc",8,10,110,-8],["f-apple",42,6,96,10],["f-fish",64,30,120,-6],["f-egg",14,48,96,6],
+   ["f-banana",44,50,110,-14],["f-avo",74,64,84,12],["f-straw",6,74,70,-10],["f-leg",30,74,88,18],
+   ["f-carrot",78,2,80,20],["f-milk",58,74,72,-4]].forEach(a => use(...a, art));
+})();
+
+document.getElementById("nutri-key").innerHTML = NORDER.map(k =>
+  `<div><i class="dot"></i><span><b>${N[k][0]}:</b> ${N[k][1]}</span></div>`).join("");
+
+// Sliding indicator under the active option.
+const slide = (wrap, active) => {
+  const ind = wrap.querySelector(".tab-ind, .seg-ind");
+  if (!ind || !active) return;
+  ind.style.width = active.offsetWidth + "px";
+  ind.style.transform = `translateX(${active.offsetLeft}px)`;
+};
+
+// Week panels with day sub-tabs.
+function buildWeek(w) {
+  const p = document.getElementById(`p-week-${w+1}`);
+  p.innerHTML = `
+    <div class="seg" role="tablist" aria-label="Day">
+      <span class="seg-ind"></span>
+      ${DAYNAMES.map((n, d) => `<button type="button" role="tab" data-d="${d}"><b>${n.slice(0,3)}</b><small>Day ${w*7+d+1}</small></button>`).join("")}
+    </div>
+    <div class="day-bar">
+      <div class="day-sum"><h2></h2><span class="nums"></span></div>
+      <div class="eaten"><span class="count"></span><i><span></span></i></div>
+    </div>
+    <div class="chips"></div>
+    <div class="meals"></div>`;
+  const seg = p.querySelector(".seg");
+  seg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    dayPick[w] = +b.dataset.d; store("day-pick-v1", dayPick); renderDay(w);
+  }));
+}
+function renderDay(w) {
+  const p = document.getElementById(`p-week-${w+1}`);
+  const d = dayPick[w], di = w * 7 + d, ids = DAYS[di];
+  const seg = p.querySelector(".seg");
+  seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", +b.dataset.d === d));
+  slide(seg, seg.querySelector(`[data-d="${d}"]`));
+  const kcal = ids.reduce((s, id) => s + R[id].k, 0), prot = ids.reduce((s, id) => s + R[id].p, 0);
+  p.querySelector(".day-sum h2").textContent = `${DAYNAMES[d]}, day ${di+1}`;
+  p.querySelector(".day-sum .nums").innerHTML = `<b>${kcal.toLocaleString()}</b> kcal · <b>${prot} g</b> protein`;
+  p.querySelector(".chips").innerHTML = NORDER.filter(n => ids.some(id => R[id].n.includes(n)))
+    .map(n => `<span class="chip">${N[n][0]}</span>`).join("");
+  const grid = p.querySelector(".meals");
+  grid.innerHTML = ids.map((id, mi) => {
+    const m = R[id], key = `d${di}-${mi}`;
+    // Cartoon versions of the main foods in this meal (up to 3).
+    const pics = [];
+    m.i.forEach(([k]) => { const s = PIC[k]; if (s && !pics.includes(s)) pics.push(s); });
+    const art = pics.slice(0, 3).map((s, j) =>
+      `<svg viewBox="0 0 64 64" style="animation-delay:${reduced ? 0 : mi * 40 + j * 50}ms"><use href="#${s}"/></svg>`).join("");
+    const [kind, note, steps] = P[id];
+    const bt = BMAP[`${di}-${id}`];
+    return `<article class="card meal${mealTicks[key] ? " done" : ""}">
+      <div class="meal-head">
+        <span class="slot"><i class="dot" style="--c:var(${SLOTS[mi][1]})"></i>${SLOTS[mi][0]}<span class="keep ${kind}">${KEEP[kind]}</span>${bt ? `<a class="keep batch" href="#batch">Batch</a>` : ""}</span>
+        <label class="tick" for="${key}"><input type="checkbox" id="${key}"${mealTicks[key] ? " checked" : ""}>Eaten</label>
+      </div>
+      <div class="meal-title">
+        <div><h3>${m.name}</h3><div class="kc"><b>${m.k} kcal</b> · ${m.p} g protein · ${m.t}</div></div>
+        <div class="meal-pics" aria-hidden="true">${art}</div>
+      </div>
+      <ul>${m.i.map(x => `<li><span>${ingText(x)}</span><b>${kcalOf(x)} kcal</b></li>`).join("")}</ul>
+      <details class="steps">
+        <summary>Step by step</summary>
+        <ol>${steps.map(s => `<li>${s}</li>`).join("")}</ol>
+        ${bt ? `<div class="store batch"><b>Batch:</b> part of "${bt.t}" on ${bt.when}.</div>` : ""}
+        <div class="store ${kind}"><b>${KEEP[kind]}:</b> ${note}</div>
+      </details>
+    </article>`;
+  }).join("");
+  if (!reduced) { grid.style.animation = "none"; grid.offsetHeight; grid.style.animation = ""; }
+  const update = () => {
+    const boxes = [...grid.querySelectorAll("input")], done = boxes.filter(b => b.checked).length;
+    p.querySelector(".eaten .count").textContent = `${done} of ${boxes.length} eaten`;
+    p.querySelector(".eaten i span").style.width = (done / boxes.length * 100) + "%";
+  };
+  grid.querySelectorAll("input").forEach(inp => inp.addEventListener("change", () => {
+    mealTicks[inp.id] = inp.checked; store("meal-ticks-v4", mealTicks);
+    inp.closest(".meal").classList.toggle("done", inp.checked); update();
+  }));
+  update();
+}
+[0, 1].forEach(w => { buildWeek(w); });
+
+// Shopping: one list per week, built from the recipes.
+function renderShop() {
+  const seg = document.getElementById("shop-seg");
+  seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", +b.dataset.w === shopWeek));
+  slide(seg, seg.querySelector(`[data-w="${shopWeek}"]`));
+  const totals = {};
+  DAYS.slice(shopWeek * 7, shopWeek * 7 + 7).flat().forEach(id => R[id].i.forEach(([k, q]) => { totals[k] = (totals[k] || 0) + q; }));
+  document.getElementById("shop").innerHTML = G.map((g, gi) => {
+    const items = Object.keys(totals).filter(k => C[k][2] === gi).sort((a, b) => C[a][0].localeCompare(C[b][0]));
+    if (!items.length) return "";
+    return `<div class="group"><h3>${g}</h3>${items.map(k => {
+      const id = `w${shopWeek}-${k}`, [n, u, , pl] = C[k];
+      return `<label for="${id}"><input type="checkbox" id="${id}"${shopTicks[id] ? " checked" : ""}><span>${cap(u === "" ? (pl || n) : n)}</span><small>${amount(k, totals[k])}</small></label>`;
+    }).join("")}</div>`;
+  }).join("");
+  document.querySelectorAll("#shop input").forEach(inp => inp.addEventListener("change", () => {
+    shopTicks[inp.id] = inp.checked; store("shop-ticks-v2", shopTicks);
+  }));
+}
+document.querySelectorAll("#shop-seg button").forEach(b => b.addEventListener("click", () => {
+  shopWeek = +b.dataset.w; store("shop-week-v1", shopWeek); renderShop();
+}));
+document.getElementById("shop-clear").addEventListener("click", () => {
+  document.querySelectorAll("#shop input").forEach(i => { i.checked = false; delete shopTicks[i.id]; });
+  store("shop-ticks-v2", shopTicks);
+});
+
+// Batch prep tab
+let batchWeek = load("batch-week-v1", 0);
+function renderBatch() {
+  const seg = document.getElementById("batch-seg");
+  seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", +b.dataset.w === batchWeek));
+  slide(seg, seg.querySelector(`[data-w="${batchWeek}"]`));
+  document.getElementById("batch-grid").innerHTML = B[batchWeek].map(b => {
+    const total = b.n.reduce((s, x) => s + kcalOf(x), 0);
+    const makes = b.n.map(x => `<li><span>${ingText(x)}</span><b>${kcalOf(x)} kcal</b></li>`).join("")
+      + (b.n.length > 1 ? `<li class="total"><span>Total</span><b>${total} kcal</b></li>` : "");
+    const feeds = b.feeds.map(([di, id]) =>
+      `<li><span><em>${DAYNAMES[di % 7].slice(0,3)}</em>${R[id].name}</span><b>${R[id].k} kcal</b></li>`).join("")
+      + (b.spare ? `<li><span><em>Freezer</em>Spare portion of ${R[b.spare].name.toLowerCase()}</span><b>${R[b.spare].k} kcal</b></li>` : "");
+    return `<article class="card bcard">
+      <div class="bcard-head"><h3>${b.t}</h3><span class="when">${b.when} · ${b.time}</span></div>
+      <div class="lbl">Makes</div><ul class="rows">${makes}</ul>
+      <p>${b.how}</p>
+      <div class="lbl">Used in</div><ul class="rows">${feeds}</ul>
+      <div class="keeps"><b>Keeps:</b> ${b.keeps}</div>
+    </article>`;
+  }).join("");
+}
+document.querySelectorAll("#batch-seg button").forEach(b => b.addEventListener("click", () => {
+  batchWeek = +b.dataset.w; store("batch-week-v1", batchWeek); renderBatch();
+}));
+
+// Tabs routed on the hash.
+const TABS = ["overview","week-1","week-2","shopping","batch","prep","tips"];
+function show() {
+  const name = TABS.includes(FOODTAB) ? FOODTAB : "overview";
+  TABS.forEach(t => { document.getElementById(`p-${t}`).hidden = t !== name; });
+  const tabs = document.getElementById("tabs");
+  tabs.querySelectorAll("a").forEach(a => a.setAttribute("aria-selected", a.dataset.tab === name));
+  const active = tabs.querySelector(`[data-tab="${name}"]`);
+  slide(tabs, active);
+  active.scrollIntoView({ block: "nearest", inline: "nearest" });
+  if (name === "week-1") renderDay(0);
+  if (name === "week-2") renderDay(1);
+  if (name === "shopping") renderShop();
+  if (name === "batch") renderBatch();
+}
+let FOODTAB = load("food-tab-v1", "overview");
+document.addEventListener("click", e => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  e.preventDefault();
+  FOODTAB = a.getAttribute("href").slice(1); store("food-tab-v1", FOODTAB); show();
+  try { const fe = window.frameElement; if (fe && fe.getBoundingClientRect().top < 0) fe.scrollIntoView({ block: "start" }); } catch (err) {}
+});
+addEventListener("resize", () => {
+  slide(document.getElementById("tabs"), document.querySelector('#tabs [aria-selected="true"]'));
+  document.querySelectorAll(".panel:not([hidden]) .seg").forEach(s => slide(s, s.querySelector('[aria-selected="true"]')));
+});
+show();
+document.fonts && document.fonts.ready.then(() => {
+  slide(document.getElementById("tabs"), document.querySelector('#tabs [aria-selected="true"]'));
+  document.querySelectorAll(".panel:not([hidden]) .seg").forEach(s => slide(s, s.querySelector('[aria-selected="true"]')));
+});
+</script>
+
+</body></html>

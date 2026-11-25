@@ -1,6 +1,6 @@
 // Ayvex Hub offline support: always try the network first (so edits show up right away),
 // and fall back to the last saved copy when there's no connection.
-const CACHE = 'ayvex-hub-v1';
+const CACHE = 'ayvex-hub-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
