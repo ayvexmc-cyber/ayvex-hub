@@ -660,7 +660,7 @@ async function initDb(){
 }
 async function startSync(id){
   uid = id;
-  document.getElementById('auth').hidden = true;
+  const authBox = document.getElementById('auth'); if (authBox) authBox.hidden = true;
   setSync(I.cloud + ' Connecting…');
   try {
     const rows = await sbLoad();
