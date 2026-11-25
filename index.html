@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ayvex Hub</title>
+<meta name="description" content="Daybook, Grade 10 Study Notes, Shorts Idea Finder and Niche Finder in one app.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f6f8f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ayvex Hub">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: computer = fixed sidebar + stage; phone = stage + bottom tab bar (safe-area aware).
+   Home = launcher cards with a picture of each app. Opening an app shows it in the stage; opened apps stay loaded.
+   Tokens match Daybook: white ground, one green accent, Bricolage display, Instrument Sans text. */
+:root{
+  --bg:#ffffff; --side:#f6f8f7; --surface:#f1f5f3; --surface-2:#e6ede9; --line:#e2e8e5;
+  --fg:#15201c; --muted:#5b6964; --faint:#8c9a95;
+  --accent:#0f7a63; --accent-hover:#0c6855; --accent-soft:#e2f1ec; --on-accent:#fff;
+  --shadow:0 1px 2px rgba(15,32,27,.05),0 8px 28px rgba(15,32,27,.10);
+  --r:16px; --r-sm:8px;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --tabbar:64px;
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased;display:grid;grid-template-columns:248px minmax(0,1fr);overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+
+/* Sidebar (computer) */
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:calc(20px + env(safe-area-inset-top,0px)) 12px 12px;gap:18px;min-height:0;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px;font:700 20px/1 var(--display);letter-spacing:-.02em}
+.brand img{width:32px;height:32px;flex:none}
+.nav{display:flex;flex-direction:column;gap:14px}
+.nav-group{display:flex;flex-direction:column;gap:2px}
+.nav-label{font-size:11px;font-weight:600;color:var(--faint);padding:0 10px 4px;letter-spacing:.04em;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:var(--r-sm);color:var(--muted);font-size:14px;font-weight:500;text-align:left;transition:background .15s ease-out,color .15s ease-out;width:100%}
+.nav-item:hover{background:var(--surface-2);color:var(--fg)}
+.nav-item[aria-current="page"]{background:var(--bg);color:var(--fg);box-shadow:0 1px 2px rgba(15,32,27,.08)}
+.nav-item img{width:22px;height:22px;flex:none}
+.nav-item .ic{width:22px;height:22px;display:grid;place-items:center;flex:none}
+.side-foot{margin-top:auto;border-top:1px solid var(--line);padding:10px 10px 4px;font-variant-numeric:tabular-nums}
+.side-foot b{display:block;font:700 20px/1.1 var(--display);letter-spacing:-.02em}
+.side-foot span{font-size:12px;color:var(--muted)}
+
+/* Stage */
+.stage{position:relative;min-width:0;min-height:0;overflow:hidden}
+.home{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch}
+.home-in{max-width:1160px;margin:0 auto;padding:40px 32px 56px;display:flex;flex-direction:column;gap:28px}
+.eyebrow{font-size:13px;color:var(--muted);margin:0 0 4px}
+.h1{font:700 36px/1.1 var(--display);letter-spacing:-.025em;margin:0}
+.apps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.app{display:flex;flex-direction:column;text-align:left;border-radius:var(--r);background:var(--surface);overflow:hidden;transition:box-shadow .25s ease-out,transform .25s ease-out,background .2s ease-out}
+.app:hover{background:var(--bg);box-shadow:var(--shadow);transform:translateY(-3px)}
+.shot{position:relative;aspect-ratio:16/9;overflow:hidden;background:var(--surface-2);margin:10px 10px 0;border-radius:10px}
+.shot img{width:100%;height:100%;object-fit:cover;object-position:top left;display:block}
+.shot::after{content:"";position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 0 0 1px rgba(15,32,27,.08)}
+.soon-pill{position:absolute;left:12px;top:12px;padding:4px 10px;border-radius:99px;background:rgba(21,32,28,.82);color:#fff;font-size:12px;font-weight:600}
+.meta{display:flex;align-items:center;gap:14px;padding:16px 18px 18px}
+.meta img{width:52px;height:52px;flex:none;filter:drop-shadow(0 4px 8px rgba(15,32,27,.15))}
+.meta-text{min-width:0;flex:1}
+.meta b{display:block;font:600 17px/1.25 var(--body);letter-spacing:-.01em}
+.meta p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.tag{flex:none;font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:99px}
+
+/* App view */
+.view{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+.view[hidden]{display:none}
+.toolbar{flex:none;display:flex;align-items:center;gap:10px;height:48px;padding:0 12px 0 14px;border-bottom:1px solid var(--line);background:var(--side)}
+.toolbar img{width:22px;height:22px}
+.toolbar b{font:600 15px/1 var(--body)}
+.toolbar .spacer{flex:1}
+.tbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:var(--r-sm);font-size:13px;color:var(--muted)}
+.tbtn:hover{background:var(--surface-2);color:var(--fg)}
+.tbtn svg{width:14px;height:14px}
+.view iframe{flex:1;width:100%;border:0;display:block;background:#fff}
+.note{margin:12vh auto 0;max-width:520px;padding:0 24px;text-align:center;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:12px}
+.note img{width:72px;height:72px}
+.note h2{font:700 24px/1.2 var(--display);color:var(--fg);margin:0}
+.note p{margin:0}
+.btn{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 18px;border-radius:12px;background:var(--accent);color:var(--on-accent);font-weight:600;font-size:15px;text-decoration:none}
+.btn:hover{background:var(--accent-hover)}
+
+/* Tab bar (phone) */
+.tabbar{display:none}
+
+/* Install hint (iPhone Safari, not yet installed) */
+.install{display:none;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--accent-soft);color:var(--fg);font-size:14px}
+.install.on{display:flex}
+.install img{width:40px;height:40px;border-radius:10px;flex:none}
+.install b{display:block}
+.install button{margin-left:auto;color:var(--muted);font-size:20px;line-height:1;padding:4px}
+
+@media (max-width:900px){
+  body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .side{display:none}
+  .stage{padding-top:env(safe-area-inset-top,0px)}
+  .home-in{padding:20px max(16px,env(safe-area-inset-left,0px)) 32px max(16px,env(safe-area-inset-right,0px));gap:20px}
+  .h1{font-size:30px}
+  .apps{grid-template-columns:minmax(0,1fr);gap:16px}
+  .app:hover{transform:none;box-shadow:none;background:var(--surface)}
+  .toolbar{height:44px}
+  .toolbar .home-btn{display:none}
+  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--line);background:rgba(246,248,247,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:6px max(4px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(4px,env(safe-area-inset-left,0px))}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 2px;font-size:10.5px;font-weight:600;color:var(--faint);min-width:0}
+  .tab img,.tab .ic{width:28px;height:28px;display:grid;place-items:center;opacity:.55;transition:opacity .15s ease-out}
+  .tab span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .tab[aria-current="page"]{color:var(--fg)}
+  .tab[aria-current="page"] img,.tab[aria-current="page"] .ic{opacity:1}
+  .tab[aria-current="page"] .ic{color:var(--accent)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<aside class="side" aria-label="Ayvex Hub">
+  <div class="brand"><img src="icons/hub.png" alt=""><span>Ayvex Hub</span></div>
+  <nav class="nav" id="nav"></nav>
+  <div class="side-foot" aria-label="Current time"><b id="clock-t">--:--</b><span id="clock-d"></span></div>
+</aside>
+<main class="stage" id="stage">
+  <div class="home" id="home"><div class="home-in" id="home-in"></div></div>
+</main>
+<nav class="tabbar" id="tabbar" aria-label="Apps"></nav>
+
+<script>
+(() => {
+const ARROW = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>';
+const I = {
+  home: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+  reload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>'
+};
+// The apps. "soon" ones are being moved online; until then they show a short note.
+const APPS = [
+  {id:'daybook', group:'Planner', name:'Daybook', short:'Daybook', desc:'Tasks, routine, reminders, calendar and your meal plan.', soon:'Daybook is moving into Ayvex Hub next, with your tasks synced to every device. Until then, open it on claude.ai.', link:'https://claude.ai/artifact/D71iaaYKdsoNaaKf6kNu4G'},
+  {id:'study', group:'School', name:'Grade 10 Study Notes', short:'Study', desc:'History, Science and English notes for every unit.', src:'apps/study/index.html'},
+  {id:'ideas', group:'YouTube', name:'Shorts Idea Finder', short:'Ideas', desc:'Daily Minecraft Shorts ideas from what is going viral.', soon:'The Idea Finder is coming to Ayvex Hub soon, with your ideas synced to every device. Until then, use it in the Ayvex Hub app on your computer.'},
+  {id:'niche', group:'YouTube', name:'Niche Finder', short:'Niche', desc:'New faceless channels and niches blowing up right now.', soon:'The Niche Finder is coming to Ayvex Hub soon, including scanning from your phone. Until then, use it in the Ayvex Hub app on your computer.'}
+];
+const GROUPS = ['Planner', 'School', 'YouTube'];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const views = {};
+
+document.getElementById('nav').innerHTML =
+  `<div class="nav-group"><button class="nav-item" data-open="home"><span class="ic">${I.home}</span><span>Home</span></button></div>` +
+  GROUPS.map(g => `<div class="nav-group"><div class="nav-label">${g}</div>${
+    APPS.filter(a => a.group === g).map(a => `<button class="nav-item" data-open="${a.id}"><img src="icons/${a.id}.png" alt=""><span>${esc(a.name)}</span></button>`).join('')
+  }</div>`).join('');
+document.getElementById('tabbar').innerHTML =
+  `<button class="tab" data-open="home"><span class="ic">${I.home}</span><span>Home</span></button>` +
+  APPS.map(a => `<button class="tab" data-open="${a.id}"><img src="icons/${a.id}.png" alt=""><span>${esc(a.short)}</span></button>`).join('');
+
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const installed = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let hideInstall = false; try { hideInstall = localStorage.getItem('ayx-install-hide') === '1'; } catch {}
+
+const greet = () => { const h = new Date().getHours(); return h < 5 ? 'Late night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
+function renderHome(){
+  document.getElementById('home-in').innerHTML = `
+    ${isIOS && !installed && !hideInstall ? `<div class="install on" id="install"><img src="apple-touch-icon.png" alt=""><span><b>Install Ayvex Hub</b>Tap Share, then Add to Home Screen.</span><button id="install-x" aria-label="Hide">×</button></div>` : ''}
+    <div><p class="eyebrow">${greet()} · ${new Date().toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'})}</p><h1 class="h1">What are we working on?</h1></div>
+    <div class="apps">${GROUPS.flatMap(g => APPS.filter(a => a.group === g)).map(a => `
+      <button class="app" data-open="${a.id}" aria-label="Open ${esc(a.name)}">
+        <span class="shot"><img src="previews/${a.id}.jpg" alt="" loading="lazy">${a.soon ? '<span class="soon-pill">Coming soon</span>' : ''}</span>
+        <span class="meta"><img src="icons/${a.id}.png" alt=""><span class="meta-text"><b>${esc(a.name)}</b><p>${esc(a.desc)}</p></span><span class="tag">${a.group}</span></span>
+      </button>`).join('')}</div>`;
+}
+
+function makeView(a){
+  const v = document.createElement('section');
+  v.className = 'view'; v.hidden = true;
+  if (a.soon) {
+    v.innerHTML = `<div class="note"><img src="icons/${a.id}.png" alt=""><h2>${esc(a.name)}</h2><p>${esc(a.soon)}</p>${a.link ? `<a class="btn" href="${a.link}" target="_blank" rel="noopener">Open ${esc(a.name)} ${ARROW}</a>` : ''}</div>`;
+  } else {
+    v.innerHTML = `<div class="toolbar"><button class="tbtn home-btn" data-open="home">${I.back} Home</button><img src="icons/${a.id}.png" alt=""><b>${esc(a.name)}</b><span class="spacer"></span><button class="tbtn" data-reload="${a.id}" aria-label="Reload">${I.reload} Reload</button></div>
+      <iframe title="${esc(a.name)}" src="${a.src}" allow="autoplay; clipboard-write"></iframe>`;
+  }
+  document.getElementById('stage').appendChild(v);
+  return v;
+}
+
+function open(id){
+  const a = APPS.find(x => x.id === id);
+  const cur = a ? a.id : 'home';
+  document.getElementById('home').hidden = !!a;
+  Object.entries(views).forEach(([k, v]) => { v.hidden = k !== cur; });
+  if (a) { if (!views[a.id]) views[a.id] = makeView(a); views[a.id].hidden = false; }
+  document.querySelectorAll('[data-open]').forEach(b => { if (b.closest('#nav, #tabbar')) b.setAttribute('aria-current', b.dataset.open === cur ? 'page' : 'false'); });
+  document.title = a ? `${a.name} · Ayvex Hub` : 'Ayvex Hub';
+  const hash = a ? '#' + a.id : '';
+  if (location.hash !== hash) history.replaceState(null, '', hash || location.pathname);
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#install-x')) { try { localStorage.setItem('ayx-install-hide', '1'); } catch {} document.getElementById('install').remove(); return; }
+  const o = e.target.closest('[data-open]');
+  if (o) { open(o.dataset.open); return; }
+  const r = e.target.closest('[data-reload]');
+  if (r) { const f = views[r.dataset.reload] && views[r.dataset.reload].querySelector('iframe'); if (f) f.src = f.src; }
+});
+
+const ET = 'America/New_York';
+const tf = new Intl.DateTimeFormat('en-US', {timeZone: ET, hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short'});
+const df = new Intl.DateTimeFormat('en-US', {timeZone: ET, weekday: 'long', month: 'long', day: 'numeric'});
+(function tick(){ const n = new Date(); document.getElementById('clock-t').textContent = tf.format(n); document.getElementById('clock-d').textContent = df.format(n); setTimeout(tick, 1000 - n.getMilliseconds() + 5); })();
+
+renderHome();
+open(decodeURIComponent(location.hash.slice(1)) || 'home');
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
